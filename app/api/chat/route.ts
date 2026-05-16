@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from './supabase';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
