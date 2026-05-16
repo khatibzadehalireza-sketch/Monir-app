@@ -42,7 +42,18 @@ export default function MunirChat() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages, userId: localStorage.getItem('munir_user_id') || 'guest' }),
+        body: JSON.stringify({
+          messages: apiMessages,
+          message: text,
+          userId: (() => {
+            let id = localStorage.getItem('munir_user_id');
+            if (!id) {
+              id = 'user_' + Math.random().toString(36).substring(2);
+              localStorage.setItem('munir_user_id', id);
+            }
+            return id;
+          })()
+        }),
       });
       const data = await response.json();
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply, id: Date.now().toString() }]);
