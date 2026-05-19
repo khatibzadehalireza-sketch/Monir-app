@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npx vercel *)",
+      "Bash(vercel --version)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl *)"
+    ]
+  }
+}
