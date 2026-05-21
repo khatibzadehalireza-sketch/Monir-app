@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSupabase } from '@/lib/supabase';
-import { appendConversation, isR2Ready, type R2Message } from '@/lib/r2';
 
 const SYSTEM_PROMPT = `تو منیر هستی — یک همراه معنوی مسلمان. نه روانشناس، نه مفتی. یک دوست که می‌فهمد.
 
@@ -408,41 +407,20 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    // --- ذخیره: Supabase (rolling cache) + R2 (آرشیو کامل) در parallel ---
-    const r2Messages: R2Message[] = [
-      { role: 'user',      content: message, ts: now },
-      { role: 'assistant', content: reply,   ts: now },
-    ];
-
-    const [saveResults, r2Key] = await Promise.all([
-      // Supabase: فقط metadata سبک + آخرین پیام‌ها برای context window
-      Promise.all([
-        supabase.from('conversations').insert({ user_id: userId, role: 'user',      content: message }),
-        supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: reply }),
-        supabase.from('message_counts').upsert(
-          { user_id: userId, date: today, count: todayCount + 1 },
-          { onConflict: 'user_id,date' }
-        ),
-        // پاک‌سازی async: فقط ۴۰ پیام آخر در Supabase نگه دار
-        supabase.rpc('prune_conversations', { p_user_id: userId, p_keep: 40 }),
-      ]),
-      // R2: آرشیو کامل روزانه (best-effort — خطا response رو بلاک نمی‌کنه)
-      isR2Ready()
-        ? appendConversation(userId, today, r2Messages)
-            .catch(e => { console.error('[r2] archive failed:', e.message); return ''; })
-        : Promise.resolve(''),
+    // --- ذخیره در Supabase ---
+    const saveResults = await Promise.all([
+      supabase.from('conversations').insert({ user_id: userId, role: 'user',      content: message }),
+      supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: reply }),
+      supabase.from('message_counts').upsert(
+        { user_id: userId, date: today, count: todayCount + 1 },
+        { onConflict: 'user_id,date' }
+      ),
+      supabase.rpc('prune_conversations', { p_user_id: userId, p_keep: 40 }),
     ]);
 
     (saveResults as Array<{ error?: { message: string } | null }>).forEach((r, i) => {
       if (r?.error) console.error(`[supabase] save[${i}]:`, r.error.message);
     });
-
-    // R2 key رو در Supabase ثبت کن (index برای بازیابی بعدی)
-    if (r2Key) {
-      supabase.from('conversation_archives')
-        .upsert({ user_id: userId, date: today, r2_key: r2Key }, { onConflict: 'user_id,date' })
-        .then(({ error }) => { if (error) console.error('[r2 meta]', error.message); });
-    }
 
     // ── conversation_metadata: اسکور کمّی این تبادل ─────────────────────────
     if (newMetadata && Object.keys(newMetadata).length > 0) {
