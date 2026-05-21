@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 interface Message { role: "user" | "assistant"; content: string; id: string; }
 
-const OPENING = "سلام، خوش اومدی 🌙 چه چیزی باعث شده بیای؟";
+const OPENING = "اینجام و دوست دارم بشنوم 🌙";
 
 export default function App() {
   const [screen, setScreen] = useState<"home" | "chat">("home");
