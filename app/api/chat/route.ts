@@ -2,90 +2,98 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSupabase } from '@/lib/supabase';
+import { appendConversation, isR2Ready, type R2Message } from '@/lib/r2';
 
-const SYSTEM_PROMPT = `⚠️ قانون زبان — بدون استثنا:
-تمام جواب‌هایت باید ۱۰۰٪ فارسی باشه. حتی یک حرف لاتین یا سیریلیک مجاز نیست. هر مفهوم تخصصی رو خالص فارسی توضیح بده. تنها استثنا: آیه‌های قرآن و احادیث عربی.
+const SYSTEM_PROMPT = `تو منیر هستی — یک همراه معنوی مسلمان. نه روانشناس، نه مفتی. یک دوست که می‌فهمد.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-تو منیر هستی — روانشناس مسلمان با سال‌ها تجربه بالینی. لحنت گرم، صادق، و بدون قضاوته. نه سرد، نه کتابی، نه موعظه‌گر.
+قوانین اصلی:
+- هرگز از الگوی می‌فهمم... گویی... بگو چه استفاده نکن — این مصنوعی است
+- جواب‌ها کوتاه باشند: ۲ تا ۴ جمله، نه بیشتر
+- هر ۲-۳ پیام یک آیه، حدیث، یا شعر عارفانه بیاور — طبیعی، نه اجباری
+- گاهی فقط گوش بده، گاهی سوال بپرس، گاهی مستقیم جواب بده
+- هرگز جمله کاربر را با کلمات دیگر تکرار نکن
+- اگر کاربر در بحران است بگو: این از دست من خارجه — با یک متخصص صحبت کن
+- فقط فارسی یا عربی. هیچ کلمه لاتین یا اروپایی مجاز نیست
 
-══ فاز اول: گوش دادن فعال — هیچ‌وقت در اولین پیام راه‌حل نده ══
+سبک گفتار:
+- گرم، صادق، محاوره‌ای
+- برادرم یا خواهرم فقط وقتی طبیعی است
+- مثل یک دوست قدیمی که عالم هم هست
 
-اگه جنسیت کاربر مشخص نیست، اول بپرس: «برادری یا خواهری؟»
+وقتی کاربر درد می‌گوید:
+- اول یک جمله همدلی کوتاه و واقعی
+- بعد یک سوال یا یک نکته از قرآن یا سنت که مستقیم به دردش بخورد
+- هرگز راه‌حل فوری نده مگر خودش بخواهد
 
-بازتاب احساس (گوش دادن فعال):
-احساس کاربر رو دقیق بازتاب بده تا بفهمه شنیده شده — نه تأیید سطحی، بلکه نشون دادن اینکه واقعاً فهمیدی:
-• «یعنی زیر این خستگی، یه نوع تنهایی هم هست که کسی نمی‌بینتش.»
-• «این که گفتی "دیگه نمی‌کشم" — یعنی مدتیه داری تنها این رو حمل می‌کنی.»
-• «پس هم دردت واقعیه، هم احساس می‌کنی نباید داشته باشیش — این خودش سنگینه.»
+وقتی سوال دینی می‌پرسد:
+- جواب مستقیم بده
+- منبع بیاور
+- اگر اختلاف نظر وجود دارد صادقانه بگو
 
-بعد از بازتاب، یک سوال لایه‌ای بپرس:
-• «این حس از کِی شروع شده — یه اتفاق خاص بود یا کم‌کم اومد؟»
-• «قبل از اینکه اینطوری بشه، چی فرق داشت؟»
-• «وقتی این فکر میاد، بدنت چه حسی داره؟»
-• «اگه این مشکل نبود، الان کجا بودی؟»
-
-══ فاز دوم: کشف ریشه با روش سقراطی ══
-
-سوال بپرس تا کاربر خودش به نتیجه برسه — نه اینکه تو نتیجه بدی:
-• «به نظر خودت این فکر که "ارزش ندارم" از کجا میاد؟»
-• «اگه به یه دوست صمیمی همین رو می‌گفت، بهش چی می‌گفتی؟»
-• «چند بار قبلاً از این بدتر بودی و رد شدی — اون موقع چی کمک کرد؟»
-• «این باور از کِی توت هست؟ یادته اولین باری که اینطور فکر کردی؟»
-
-وقتی الگو روشن شد، یه جمله بازتاب بده:
-«پس اگه درست فهمیدم، ریشه اصلی اینه که... — درسته؟»
-
-══ فاز سوم: راه‌حل اسلامی — فقط بعد از فهم کامل ══
-
-الف) اگه مشکل از تحریف فکری باشه (افکار منفی مثل «بی‌ارزشم»، «همه از من متنفرن»، «هیچ‌وقت درست نمیشه»):
-روش شناختی اسلامی — افکار منفی رو با آیات به چالش بکش:
-• «این فکر که "دیگه هیچ‌کس کنارم نیست" — با «وَنَحنُ أَقرَبُ إِلَیهِ مِن حَبلِ الوَرید» چطور کنار میاد؟»
-• یک تمرین عملی بده: «امشب روی کاغذ بنویس این فکر چقدر واقعیه — چه شواهدی داره، چه شواهدی علیهشه.»
-
-ب) اگه مشکل فقدان یا داغ باشه (مرگ، جدایی، از دست دادن):
-مراحل داغ رو بشناس و با آدم همراه بشو، نه اینکه عجله داشته باشی:
-• «داغ یعنی عشقت هنوز زنده‌ست — این درد نشونه‌ی اینه که چقدر ارزش داشت.»
-• «اسلام گریه رو نه‌تنها مجاز می‌دونه، بلکه رحمت می‌دونه — پیامبر هم برای پسرش گریست.»
-• «یه راه برای نگه داشتن یادشه: براش صدقه بده، براش دعا کن — این ارتباط قطع نمیشه.»
-• سوال بپرس: «آیا فرصت داشتی اون رو درست خداحافظی کنی؟»
-
-ج) راه‌حل عملی اسلامی برای بقیه مشکلات:
-• یک کار مشخص، قابل انجام، متناسب با این آدم خاص.
-  مثال: «امشب ده دقیقه بنویس چی اذیتت می‌کنه — بدون سانسور.»
-  مثال: «قبل از خواب سه بار استغفر بگو و تصور کن اون سنگینی از روی شونه‌هات برداشته می‌شه.»
-• اگه واقعاً مناسب بود، یک آیه یا حدیث دقیقاً مرتبط بیار — نه تزئینی، نه اجباری.
-
-══ قوانین همیشگی ══
-• هر جواب حداکثر ۳ تا ۴ جمله. هرگز بیشتر.
-• هیچ‌وقت موضع نمی‌گیری، سرزنش نمی‌کنی، مقایسه نمی‌کنی.
-• فقط از چیزی که کاربر صریحاً گفته استفاده کن — هرگز چیزی حدس نزن.
-• اگه نشانه‌ای از آسیب به خود دیدی، آروم و بدون وحشت بپرس: «می‌خوام مطمئن بشم که در امانی — الان آسیبی به خودت رسوندی؟»`;
+یادآوری: تو جای خدا یا روانپزشک را نمی‌گیری. پل هستی، نه مقصد.`;
 
 // خروجی JSON با فیلدهای ساختاریافته
-const PROFILE_EXTRACT_PROMPT = `از پیام کاربر اطلاعاتی که صریحاً گفته رو استخراج کن و به‌صورت JSON برگردون.
+const PROFILE_EXTRACT_PROMPT = `تحلیل‌گر حافظه هستی. پیام کاربر + پروفایل فعلی رو بررسی کن و فیلدهایی که واقعاً تغییر کردن رو به JSON برگردون.
+
 فیلدها:
-- name: اسم کاربر (اگه گفته)
-- gender: "برادر" یا "خواهر" (اگه گفته)
-- emotional_state: وضعیت احساسی فعلی به فارسی (اگه مشخص شده)
-- topic_tags: آرایه‌ای از موضوعات مرتبط به فارسی، حداکثر ۵ تا
-- religiosity_level: "بالا"، "متوسط"، یا "پایین" (فقط اگه خیلی واضح مشخص شده)
+- name: اسم کاربر (فقط اگه صریحاً گفته)
+- gender: "برادر" یا "خواهر" (فقط اگه صریحاً گفته)
+- emotional_state: وضعیت احساسی فعلی به فارسی (از پیام مستقیم)
+- topic_tags: آرایه موضوعات جدید به فارسی، حداکثر ۵ تا
+- religiosity_level: "بالا"، "متوسط"، یا "پایین" (فقط اگه خیلی واضح باشه)
+
+- spiritual_journey_stage: مرحله سفر معنوی — فقط یکی:
+  * "تازه‌کار": تازه شروع کرده، سوالات پایه‌ای داره، دنبال جهت‌گیری اولیه‌ست
+  * "در حال رشد": فعالانه تمرین می‌کنه، پیشرفت می‌بینه، سوالاتش عمیق‌تر شده
+  * "بحران ایمانی": شک جدی، احساس دوری از خدا، یا چالش اعتقادی آشکار
+  * "ثبات": آرامش نسبی، ایمان پایدار، دنبال تعمیق نه حل بحران
+  (فقط اگه از کل مکالمه واضح باشه — در غیر این صورت نگذار)
+
+- recurring_struggles: مشکلاتی که قبلاً هم در پروفایل بودن یا الان دوباره ذکر شدن.
+  قانون سخت: فقط اضافه کن اگه موضوع در "topic_tags" یا "recurring_struggles" پروفایل فعلی قبلاً دیده شده باشه.
+  فرمت: آرایه رشته‌های کوتاه فارسی، حداکثر ۳ آیتم جدید
+
+- breakthrough_moments: لحظه پیشرفت، بصیرت، یا تغییر مثبت آشکار.
+  قانون سخت: فقط اضافه کن اگه کاربر صریحاً از احساس بهتر، تغییر، یا بصیرت جدید گفته.
+  نمونه‌هایی که واجد شرایطن: «فهمیدم که...»، «الان بهترم»، «این کمک کرد»، «تونستم...»
+  فرمت: آرایه رشته‌های کوتاه فارسی، حداکثر ۳ آیتم جدید
+
 - summary: خلاصه یک‌خطی پروفایل، حداکثر ۲۰۰ کاراکتر
 
-قانون: فقط فیلدهایی که واقعاً تغییر کردن یا اضافه شدن رو برگردون.
-اگه هیچ اطلاعات جدیدی نیست فقط برگردون: {"changed": false}
-در غیر این صورت: {"changed": true, ...فیلدهای جدید/تغییریافته}`;
+قانون خروجی:
+اگه هیچ چیز واقعی تغییر نکرده: {"changed": false}
+در غیر این صورت: {"changed": true, ...فقط فیلدهایی که واقعاً آپدیت شدن}`;
 
-// دسته‌بندی موضوعی پیام
-const TOPIC_CLASSIFY_PROMPT = `پیام کاربر رو در یکی از این دسته‌ها قرار بده و فقط همون کلمه رو بنویس:
-- religious: سوال درباره اسلام، قرآن، نماز، ایمان، عبادت
-- emotional: احساسات، روابط، غم، اضطراب، تنهایی، خوشحالی
-- identity: هویت، هدف زندگی، خودشناسی، جایگاه
-- deepthinking: فلسفه، معنای زندگی، سوالات وجودی، شک
+// استخراج metadata کمّی از هر تبادل کاربر ↔ منیر
+const METADATA_EXTRACT_PROMPT = `تحلیل‌گر رفتاری هستی. از تبادل زیر، فیلدهای ساختاریافته رو به JSON برگردون.
 
-فقط یک کلمه خروجی بده.`;
+فیلدها:
+- topic: موضوع اصلی — یکی از: خانواده | ازدواج | تنهایی | اضطراب | افسردگی | ایمان | هویت | کار | تحصیل | سوگ | خشم | روابط | سلامت | خودارزیابی | سایر
+- subtopic: موضوع جزئی‌تر، حداکثر ۳ کلمه فارسی
+- emotional_state: یکی از: آرام | ناراحت | مضطرب | افسرده | عصبانی | امیدوار | گیج | آسیب‌پذیر | بحران
+- anxiety_score: عدد صحیح ۰ تا ۱۰ (شدت اضطراب)
+- loneliness_score: عدد صحیح ۰ تا ۱۰ (شدت تنهایی)
+- guilt_score: عدد صحیح ۰ تا ۱۰ (شدت احساس گناه)
+- hope_score: عدد صحیح ۰ تا ۱۰ (میزان امید)
+- urgency: low | medium | high | critical
+- conversation_depth: عدد صحیح ۱ تا ۵ (۱=سطحی، ۵=بحران عمیق/بیان درد شدید)
 
-type TopicCategory = 'religious' | 'emotional' | 'identity' | 'deepthinking';
+فقط JSON خالص بدون توضیح اضافه.`;
+
+// استخراج هویت دموگرافیک — privacy-safe (هرگز نام/ایمیل/شماره نیست)
+const IDENTITY_EXTRACT_PROMPT = `از پیام کاربر، اطلاعات هویتی قابل استنتاج رو استخراج کن.
+فقط فیلدهایی که از متن واقعاً مشخصن رو برگردون — حدس نزن.
+
+فیلدها:
+- language: کد زبان (fa / en / ar / tr / ...)
+- country: کشور اگه صریحاً ذکر شده
+- age_range: under_18 | 18-25 | 26-35 | 36-50 | over_50
+- convert_status: born_muslim | convert | exploring | unknown
+- generation: Z | millennial | X | boomer | unknown
+- communication_style: formal | informal | mixed
+
+اگه هیچ اطلاعات جدیدی نیست: {"changed": false}
+در غیر این صورت: {"changed": true, ...فقط فیلدهای مشخص‌شده}`;
 
 interface ProfileData {
   changed: boolean;
@@ -95,6 +103,109 @@ interface ProfileData {
   topic_tags?: string[];
   religiosity_level?: string;
   summary?: string;
+  spiritual_journey_stage?: string;
+  recurring_struggles?: string[];
+  breakthrough_moments?: string[];
+  last_checkin?: string;
+}
+
+interface MetadataData {
+  topic?: string;
+  subtopic?: string;
+  emotional_state?: string;
+  anxiety_score?: number;
+  loneliness_score?: number;
+  guilt_score?: number;
+  hope_score?: number;
+  urgency?: string;
+  conversation_depth?: number;
+}
+
+interface IdentityData {
+  changed: boolean;
+  language?: string;
+  country?: string;
+  age_range?: string;
+  convert_status?: string;
+  generation?: string;
+  communication_style?: string;
+}
+
+function sanitizePersianResponse(text: string): string {
+  // Whitelist approach: keep only allowed code-point ranges.
+  // Regex \b fails on Unicode; Array.from handles surrogate pairs correctly.
+  const filtered = Array.from(text).filter(char => {
+    const cp = char.codePointAt(0)!;
+    return (
+      // Whitespace: tab / LF / CR / space
+      (cp >= 0x09   && cp <= 0x0D)   || cp === 0x20   ||
+      // Persian quotation marks « »  (U+00AB, U+00BB)
+      cp === 0x00AB || cp === 0x00BB ||
+      // ASCII digits 0–9
+      (cp >= 0x30   && cp <= 0x39)   ||
+      // ASCII punctuation blocks — explicitly excludes A–Z (41–5A) and a–z (61–7A)
+      (cp >= 0x21   && cp <= 0x2F)   ||   // ! " # $ % & ' ( ) * + , - . /
+      (cp >= 0x3A   && cp <= 0x40)   ||   // : ; < = > ? @
+      (cp >= 0x5B   && cp <= 0x60)   ||   // [ \ ] ^ _ `
+      (cp >= 0x7B   && cp <= 0x7E)   ||   // { | } ~
+      // Arabic & Persian script: letters, harakat, digits ۰–۹, ؟ ، ؛ ٪ …
+      (cp >= 0x0600 && cp <= 0x06FF) ||
+      (cp >= 0x0750 && cp <= 0x077F) ||   // Arabic Supplement
+      (cp >= 0x08A0 && cp <= 0x08FF) ||   // Arabic Extended-A
+      // Arabic Presentation Forms (ligatures like ﷲ, lam-alef, etc.)
+      (cp >= 0xFB50 && cp <= 0xFDFF) ||
+      (cp >= 0xFE70 && cp <= 0xFEFF) ||
+      // General & typographic punctuation: — … ‌ ‍ • ‹ › „ " " ' '
+      (cp >= 0x2000 && cp <= 0x206F) ||
+      // Miscellaneous symbols & dingbats (✓ ★ ♦ etc.)
+      (cp >= 0x2600 && cp <= 0x27BF) ||
+      // Emoji: Misc Pictographs → Supplemental Symbols & Pictographs
+      (cp >= 0x1F300 && cp <= 0x1FAFF) ||
+      // Emoji variation selectors (U+FE00–FE0F)
+      (cp >= 0xFE00 && cp <= 0xFE0F)
+    );
+  }).join('');
+
+  return filtered
+    .replace(/ {2,}/g, ' ')       // collapse accidental double-spaces after removal
+    .replace(/\n{3,}/g, '\n\n')   // max two consecutive newlines
+    .trim();
+}
+
+// Merge two string arrays without duplicates, capped at max items
+function mergeUnique(existing: string[] | undefined, incoming: string[] | undefined, max: number): string[] | undefined {
+  if (!incoming?.length) return existing;
+  if (!existing?.length) return incoming.slice(0, max);
+  const seen = new Set(existing);
+  const merged = [...existing, ...incoming.filter(i => !seen.has(i))];
+  return merged.slice(0, max);
+}
+
+// Inject a 7-day check-in reminder into the system prompt if due
+function getCheckinContext(profile: Record<string, any>): { checkinInjection: string; shouldUpdateCheckin: boolean } {
+  if (!profile.last_checkin) return { checkinInjection: '', shouldUpdateCheckin: false };
+
+  const daysSince = Math.floor(
+    (Date.now() - new Date(profile.last_checkin).getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (daysSince < 7) return { checkinInjection: '', shouldUpdateCheckin: false };
+
+  const struggles: string[] = profile.recurring_struggles ?? [];
+  const moments: string[]   = profile.breakthrough_moments ?? [];
+  const topics: string[]    = profile.topic_tags ?? [];
+
+  // Most recent memorable item to reference
+  const ref = struggles.at(-1) ?? moments.at(-1) ?? topics.at(0);
+  if (!ref) return { checkinInjection: '', shouldUpdateCheckin: false };
+
+  const checkinInjection =
+    `\n【چک‌این ${daysSince} روزه — اجرای فوری】\n` +
+    `در اولین جمله‌ات، قبل از هر چیز دیگه‌ای، دقیقاً این رو بپرس:\n` +
+    `«یادته یه بار از "${ref}" حرف زدی؟ این روزا چطوری؟»\n` +
+    `صبر کن جواب بده — شاید حلش کرده، شاید عمیق‌تر شده.\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  return { checkinInjection, shouldUpdateCheckin: true };
 }
 
 function detectDeviceType(ua: string): 'mobile' | 'desktop' {
@@ -123,11 +234,14 @@ function buildGeminiHistory(messages: Array<{ role: string; content: string }>) 
 
 function buildProfileContext(profile: Record<string, any>): string {
   const lines: string[] = [];
-  if (profile.name)              lines.push(`• اسم: ${profile.name}`);
-  if (profile.gender)            lines.push(`• جنسیت: ${profile.gender}`);
-  if (profile.emotional_state)   lines.push(`• وضعیت احساسی اخیر: ${profile.emotional_state}`);
-  if (profile.religiosity_level) lines.push(`• سطح دینداری: ${profile.religiosity_level}`);
-  if (profile.topic_tags?.length) lines.push(`• موضوعاتی که قبلاً مطرح کرده: ${profile.topic_tags.join('، ')}`);
+  if (profile.name)                        lines.push(`• اسم: ${profile.name}`);
+  if (profile.gender)                      lines.push(`• جنسیت: ${profile.gender}`);
+  if (profile.emotional_state)             lines.push(`• وضعیت احساسی اخیر: ${profile.emotional_state}`);
+  if (profile.religiosity_level)           lines.push(`• سطح دینداری: ${profile.religiosity_level}`);
+  if (profile.spiritual_journey_stage)     lines.push(`• مرحله سفر معنوی: ${profile.spiritual_journey_stage}`);
+  if (profile.topic_tags?.length)          lines.push(`• موضوعاتی که قبلاً مطرح کرده: ${profile.topic_tags.join('، ')}`);
+  if (profile.recurring_struggles?.length) lines.push(`• مشکلات تکرارشونده: ${profile.recurring_struggles.join('، ')}`);
+  if (profile.breakthrough_moments?.length) lines.push(`• لحظات پیشرفت: ${profile.breakthrough_moments.join('، ')}`);
   if (!lines.length) return '';
   return [
     '【اطلاعات ذخیره‌شده از مکالمات قبلی این کاربر】',
@@ -155,19 +269,23 @@ export async function POST(request: NextRequest) {
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const supabase = getSupabase();
 
-    const today = new Date().toISOString().split('T')[0];
+    const today     = new Date().toISOString().split('T')[0];
+    const sessionId = `${userId}_${sessionStartTime.replace(/\D/g, '').slice(2, 16)}`;
+    const timezone  = request.headers.get('cf-timezone') ?? request.headers.get('x-timezone') ?? null;
 
-    // --- لیمیت + پروفایل + تاریخچه در parallel ---
-    const [countResult, profileResult, historyResult] = await Promise.all([
+    // --- لیمیت + پروفایل + تاریخچه + هویت در parallel ---
+    const [countResult, profileResult, historyResult, identityResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('conversations').select('role, content').eq('user_id', userId)
         .in('role', ['user', 'assistant']).order('created_at', { ascending: false }).limit(10),
+      supabase.from('user_identity').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
     if (countResult.error)   console.error('[supabase] message_counts:', countResult.error.message);
     if (profileResult.error) console.error('[supabase] user_profiles:', profileResult.error.message);
     if (historyResult.error) console.error('[supabase] conversations:', historyResult.error.message);
+    if (identityResult.error) console.error('[supabase] user_identity:', identityResult.error.message);
 
     const countRow   = countResult.data;
     const profileRow = profileResult.data;
@@ -185,7 +303,8 @@ export async function POST(request: NextRequest) {
     const currentProfile: Record<string, any> = profileRow ?? {};
     const history = rawHistory ? [...rawHistory].reverse() : [];
 
-    const systemFinal = buildProfileContext(currentProfile) + SYSTEM_PROMPT;
+    const { checkinInjection, shouldUpdateCheckin } = getCheckinContext(currentProfile);
+    const systemFinal = buildProfileContext(currentProfile) + checkinInjection + SYSTEM_PROMPT;
 
     const groqMessages = [
       ...history.map((h: any) => ({ role: h.role as 'user' | 'assistant', content: h.content })),
@@ -199,24 +318,34 @@ export async function POST(request: NextRequest) {
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'system', content: systemFinal }, ...groqMessages],
         max_tokens: 1024,
-        temperature: 0.85,
+        temperature: 0.7,
       });
-      reply = completion.choices[0]?.message?.content || 'فرزندم، لحظه‌ای صبر کن...';
+      reply = sanitizePersianResponse(completion.choices[0]?.message?.content || 'فرزندم، لحظه‌ای صبر کن...');
     } catch (err: any) {
       if (err?.status !== 429 && err?.status !== 503 && err?.status !== 529) throw err;
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
       const gemini = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: systemFinal });
       const chat = gemini.startChat({ history: buildGeminiHistory(groqMessages.slice(0, -1)) });
       const result = await chat.sendMessage(message);
-      reply = result.response.text() || 'فرزندم، لحظه‌ای صبر کن...';
+      reply = sanitizePersianResponse(result.response.text() || 'فرزندم، لحظه‌ای صبر کن...');
     }
 
-    // ۲. پروفایل + topic در parallel با مدل سبک‌تر (بعد از reply تا rate-limit نخوریم)
-    const [profileSettled, topicSettled] = await Promise.allSettled([
+    // ۲. استخراج‌های parallel با مدل سبک‌تر (بعد از reply تا rate-limit نخوریم)
+    const currentIdentity: Record<string, any> = identityResult.data ?? {};
+    const identityIsComplete = !!(currentIdentity.language && currentIdentity.communication_style && currentIdentity.convert_status);
 
+    const [profileSettled, metadataSettled, identitySettled] = await Promise.allSettled([
+
+      // ── پروفایل: حافظه بلندمدت کاربر ──────────────────────────────────────
       (async (): Promise<ProfileData | null> => {
-        const currentSummary = currentProfile.summary
-          ? `\n\nپروفایل فعلی: ${JSON.stringify({ name: currentProfile.name, gender: currentProfile.gender, emotional_state: currentProfile.emotional_state, religiosity_level: currentProfile.religiosity_level, topic_tags: currentProfile.topic_tags })}`
+        const profileCtx: Record<string, unknown> = {};
+        if (currentProfile.emotional_state)              profileCtx.emotional_state = currentProfile.emotional_state;
+        if (currentProfile.topic_tags?.length)           profileCtx.topic_tags = currentProfile.topic_tags;
+        if (currentProfile.recurring_struggles?.length)  profileCtx.recurring_struggles = currentProfile.recurring_struggles;
+        if (currentProfile.breakthrough_moments?.length) profileCtx.breakthrough_moments = currentProfile.breakthrough_moments;
+        if (currentProfile.spiritual_journey_stage)      profileCtx.spiritual_journey_stage = currentProfile.spiritual_journey_stage;
+        const currentSummary = Object.keys(profileCtx).length
+          ? `\n\nپروفایل فعلی:\n${JSON.stringify(profileCtx)}`
           : '';
         const res = await groq.chat.completions.create({
           model: 'llama-3.1-8b-instant',
@@ -224,7 +353,7 @@ export async function POST(request: NextRequest) {
             { role: 'system', content: PROFILE_EXTRACT_PROMPT + currentSummary },
             { role: 'user', content: message },
           ],
-          max_tokens: 200,
+          max_tokens: 300,
           temperature: 0.1,
           response_format: { type: 'json_object' },
         });
@@ -233,54 +362,159 @@ export async function POST(request: NextRequest) {
         return parsed.changed ? parsed : null;
       })(),
 
-      (async (): Promise<TopicCategory | null> => {
+      // ── metadata: اسکور کمّی هر تبادل ──────────────────────────────────────
+      (async (): Promise<MetadataData | null> => {
         const res = await groq.chat.completions.create({
           model: 'llama-3.1-8b-instant',
           messages: [
-            { role: 'system', content: TOPIC_CLASSIFY_PROMPT },
+            { role: 'system', content: METADATA_EXTRACT_PROMPT },
+            { role: 'user', content: `کاربر: ${message}\nمنیر: ${reply}` },
+          ],
+          max_tokens: 200,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+        const raw = res.choices[0]?.message?.content || '{}';
+        return JSON.parse(raw) as MetadataData;
+      })(),
+
+      // ── هویت: فقط وقتی پروفایل هنوز کامل نشده ──────────────────────────────
+      (async (): Promise<IdentityData | null> => {
+        if (identityIsComplete) return null;
+        const res = await groq.chat.completions.create({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: IDENTITY_EXTRACT_PROMPT },
             { role: 'user', content: message },
           ],
-          max_tokens: 10,
+          max_tokens: 150,
           temperature: 0.1,
+          response_format: { type: 'json_object' },
         });
-        const raw = res.choices[0]?.message?.content?.trim().toLowerCase();
-        const valid: TopicCategory[] = ['religious', 'emotional', 'identity', 'deepthinking'];
-        return valid.find(v => raw?.includes(v)) ?? null;
+        const raw = res.choices[0]?.message?.content || '{"changed":false}';
+        const parsed = JSON.parse(raw) as IdentityData;
+        return parsed.changed ? parsed : null;
       })(),
     ]);
 
-    const newProfileData = profileSettled.status === 'fulfilled' ? profileSettled.value : null;
-    const topicCategory = topicSettled.status === 'fulfilled' ? topicSettled.value : null;
+    const newProfileData  = profileSettled.status  === 'fulfilled' ? profileSettled.value  : null;
+    const newMetadata     = metadataSettled.status  === 'fulfilled' ? metadataSettled.value  : null;
+    const newIdentityData = identitySettled.status  === 'fulfilled' ? identitySettled.value  : null;
 
-    if (profileSettled.status === 'rejected')
-      console.error('[profile] extraction failed:', (profileSettled as any).reason?.message);
-    else
-      console.log('[profile] extracted:', JSON.stringify(newProfileData));
+    if (profileSettled.status  === 'rejected') console.error('[profile]',  (profileSettled  as any).reason?.message);
+    if (metadataSettled.status === 'rejected') console.error('[metadata]', (metadataSettled as any).reason?.message);
+    if (identitySettled.status === 'rejected') console.error('[identity]', (identitySettled as any).reason?.message);
+    else console.log('[profile] extracted:', JSON.stringify(newProfileData));
 
-    // --- ذخیره در Supabase (هر save مستقل، خطاها log می‌شن) ---
-    const saveResults = await Promise.all([
-      supabase.from('conversations').insert({ user_id: userId, role: 'user', content: message }),
-      supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: reply }),
-      supabase.from('message_counts').upsert(
-        { user_id: userId, date: today, count: todayCount + 1 },
-        { onConflict: 'user_id,date' }
-      ),
+    const now = new Date().toISOString();
+
+    // --- ذخیره: Supabase (rolling cache) + R2 (آرشیو کامل) در parallel ---
+    const r2Messages: R2Message[] = [
+      { role: 'user',      content: message, ts: now },
+      { role: 'assistant', content: reply,   ts: now },
+    ];
+
+    const [saveResults, r2Key] = await Promise.all([
+      // Supabase: فقط metadata سبک + آخرین پیام‌ها برای context window
+      Promise.all([
+        supabase.from('conversations').insert({ user_id: userId, role: 'user',      content: message }),
+        supabase.from('conversations').insert({ user_id: userId, role: 'assistant', content: reply }),
+        supabase.from('message_counts').upsert(
+          { user_id: userId, date: today, count: todayCount + 1 },
+          { onConflict: 'user_id,date' }
+        ),
+        // پاک‌سازی async: فقط ۴۰ پیام آخر در Supabase نگه دار
+        supabase.rpc('prune_conversations', { p_user_id: userId, p_keep: 40 }),
+      ]),
+      // R2: آرشیو کامل روزانه (best-effort — خطا response رو بلاک نمی‌کنه)
+      isR2Ready()
+        ? appendConversation(userId, today, r2Messages)
+            .catch(e => { console.error('[r2] archive failed:', e.message); return ''; })
+        : Promise.resolve(''),
     ]);
-    saveResults.forEach(({ error }, i) => {
-      if (error) console.error(`[supabase] save[${i}]:`, error.message);
+
+    (saveResults as Array<{ error?: { message: string } | null }>).forEach((r, i) => {
+      if (r?.error) console.error(`[supabase] save[${i}]:`, r.error.message);
     });
 
-    if (newProfileData) {
-      const { changed: _, ...fields } = newProfileData;
-      const merged = { ...currentProfile, ...fields, user_id: userId, updated_at: new Date().toISOString() };
+    // R2 key رو در Supabase ثبت کن (index برای بازیابی بعدی)
+    if (r2Key) {
+      supabase.from('conversation_archives')
+        .upsert({ user_id: userId, date: today, r2_key: r2Key }, { onConflict: 'user_id,date' })
+        .then(({ error }) => { if (error) console.error('[r2 meta]', error.message); });
+    }
+
+    // ── conversation_metadata: اسکور کمّی این تبادل ─────────────────────────
+    if (newMetadata && Object.keys(newMetadata).length > 0) {
+      const clamp = (v: unknown, lo: number, hi: number): number | undefined => {
+        const n = typeof v === 'number' ? Math.round(v) : undefined;
+        return n !== undefined ? Math.max(lo, Math.min(hi, n)) : undefined;
+      };
+      supabase.from('conversation_metadata').insert({
+        user_id:            userId,
+        session_id:         sessionId,
+        topic:              newMetadata.topic              ?? null,
+        subtopic:           newMetadata.subtopic           ?? null,
+        emotional_state:    newMetadata.emotional_state    ?? null,
+        anxiety_score:      clamp(newMetadata.anxiety_score,     0, 10),
+        loneliness_score:   clamp(newMetadata.loneliness_score,  0, 10),
+        guilt_score:        clamp(newMetadata.guilt_score,       0, 10),
+        hope_score:         clamp(newMetadata.hope_score,        0, 10),
+        urgency:            newMetadata.urgency            ?? null,
+        conversation_depth: clamp(newMetadata.conversation_depth, 1, 5),
+      }).then(({ error }) => { if (error) console.error('[meta insert]', error.message); });
+    }
+
+    // ── user_identity: هویت دموگرافیک (fire-and-forget) ─────────────────────
+    if (newIdentityData || (!currentIdentity.user_id)) {
+      const { changed: _c, ...identityFields } = newIdentityData ?? { changed: false };
+      const identityMerged: Record<string, any> = {
+        ...currentIdentity,
+        ...identityFields,
+        user_id:    userId,
+        updated_at: now,
+        // زبان از detectLanguage قابل اطمینان‌تر از LLM هست
+        language:   currentIdentity.language ?? (identityFields as any).language ?? languageDetected,
+        // جنسیت از user_profiles میاد
+        gender:     currentProfile.gender    ?? currentIdentity.gender ?? null,
+        // timezone از request header
+        timezone:   currentIdentity.timezone ?? timezone ?? null,
+      };
+      supabase.from('user_identity')
+        .upsert(identityMerged, { onConflict: 'user_id' })
+        .then(({ error }) => { if (error) console.error('[identity upsert]', error.message); });
+    }
+
+    if (newProfileData || shouldUpdateCheckin || !currentProfile.last_checkin) {
+      const extracted = newProfileData
+        ? Object.fromEntries(Object.entries(newProfileData).filter(([k]) => k !== 'changed'))
+        : {};
+
+      const merged: Record<string, any> = {
+        ...currentProfile,
+        ...extracted,
+        user_id:    userId,
+        updated_at: now,
+        // last_checkin: set on first message; only refreshed when 7-day checkin fires
+        last_checkin: (!currentProfile.last_checkin || shouldUpdateCheckin)
+          ? now
+          : currentProfile.last_checkin,
+        // Arrays: merge new items into existing, no duplicates, capped
+        topic_tags:           mergeUnique(currentProfile.topic_tags,           (extracted as any).topic_tags,           10),
+        recurring_struggles:  mergeUnique(currentProfile.recurring_struggles,  (extracted as any).recurring_struggles,   6),
+        breakthrough_moments: mergeUnique(currentProfile.breakthrough_moments, (extracted as any).breakthrough_moments,  6),
+      };
+
       if (!merged.summary) {
         const parts: string[] = [];
-        if (merged.name)              parts.push(`اسم: ${merged.name}`);
-        if (merged.gender)            parts.push(`جنسیت: ${merged.gender}`);
-        if (merged.emotional_state)   parts.push(`احساس: ${merged.emotional_state}`);
-        if (merged.religiosity_level) parts.push(`دینداری: ${merged.religiosity_level}`);
+        if (merged.name)                    parts.push(`اسم: ${merged.name}`);
+        if (merged.gender)                  parts.push(`جنسیت: ${merged.gender}`);
+        if (merged.emotional_state)         parts.push(`احساس: ${merged.emotional_state}`);
+        if (merged.religiosity_level)       parts.push(`دینداری: ${merged.religiosity_level}`);
+        if (merged.spiritual_journey_stage) parts.push(`مرحله: ${merged.spiritual_journey_stage}`);
         merged.summary = parts.join(' | ').slice(0, 200);
       }
+
       const { error: profileSaveErr } = await supabase
         .from('user_profiles')
         .upsert(merged, { onConflict: 'user_id' });
