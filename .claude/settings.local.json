@@ -5,7 +5,12 @@
       "Bash(npx vercel *)",
       "Bash(vercel --version)",
       "Bash(python3 -m json.tool)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "PowerShell(wrangler *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gh run *)"
     ]
   }
 }

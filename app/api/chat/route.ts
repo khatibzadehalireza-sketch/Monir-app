@@ -3,6 +3,35 @@ import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSupabase } from '@/lib/supabase';
 
+
+// ─── Safety Layer ───────────────────────────────
+// این بخش قبل از هر چیز چک می‌کنه کاربر در بحران هست یا نه
+
+const CRISIS_KEYWORDS = [
+  'خودکشی', 'کشتن خودم', 'نمی‌خوام زندگی کنم',
+  'می‌خوام بمیرم', 'آسیب به خودم', 'به خودم آسیب',
+  'دیگه نمی‌خوام باشم', 'راحت بشم از این زندگی'
+]
+
+const EXTREMISM_KEYWORDS = [
+  'باید کشته بشه', 'کافر باید', 'انفجار'
+]
+
+// این تابع پیام کاربر رو چک می‌کنه
+function safetyCheck(message: string): 'CRISIS' | 'EXTREMISM' | 'SAFE' {
+  if (CRISIS_KEYWORDS.some(k => message.includes(k))) return 'CRISIS'
+  if (EXTREMISM_KEYWORDS.some(k => message.includes(k))) return 'EXTREMISM'
+  return 'SAFE'
+}
+
+// جواب منیر وقتی کاربر در بحرانه
+const CRISIS_RESPONSE = `برادرم/خواهرم، آنچه می‌گویی برایم مهم است.
+این لحظه نیاز به یک انسان واقعی داری.
+لطفاً همین الان تماس بگیر:
+🇳🇱 هلند: 0800-0113 (رایگان، ۲۴ ساعته)
+من اینجام — ولی تو لایق کمک واقعی هستی.`
+// ─────────────────────────────────────────────────
+
 const SYSTEM_PROMPT = `تو منیر هستی — همراه معنوی مسلمانان. ترکیبی از دوست، روانشناس، و عالم دینی.
 
 اصول روانشناسی که استفاده می‌کنی:
@@ -268,6 +297,17 @@ export async function POST(request: NextRequest) {
     const sessionMessageCount: number = body.sessionMessageCount || 1;
     const deviceType = detectDeviceType(request.headers.get('user-agent') || '');
     const languageDetected = detectLanguage(message);
+    
+// Safety Check — اول از همه بحران رو چک کن
+  const safetyResult = safetyCheck(message)
+  if (safetyResult === 'CRISIS') {
+    return NextResponse.json({ reply: CRISIS_RESPONSE })
+  }
+  if (safetyResult === 'EXTREMISM') {
+    return NextResponse.json({ 
+      reply: 'برادرم، این مسیر نیست. بگو چه دردی داری — گوش می‌دم.' 
+    })
+  }
 
     if (!message) {
       return NextResponse.json({ error: 'message الزامی' }, { status: 400 });
