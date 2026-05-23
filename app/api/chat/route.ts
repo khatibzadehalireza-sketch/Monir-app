@@ -316,44 +316,53 @@ interface IdentityData {
   communication_style?: string;
 }
 
-function sanitizePersianResponse(text: string): string {
-  // Whitelist approach: keep only allowed code-point ranges.
-  // Regex \b fails on Unicode; Array.from handles surrogate pairs correctly.
-  const filtered = Array.from(text).filter(char => {
+function filterResponse(text: string): string {
+  // Protected words - never remove these
+  const protected_words: string[] = [];
+  const protectedPattern = /\b([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*|Allah|Quran|Islam|Muslim|Monir|deldor)\b/g;
+
+  let processed = text;
+  let i = 0;
+  processed = processed.replace(protectedPattern, (match) => {
+    protected_words.push(match);
+    return `__${i++}__`;
+  });
+
+  // Filter character by character
+  const filtered = Array.from(processed).filter(char => {
     const cp = char.codePointAt(0)!;
     return (
-      // Whitespace: tab / LF / CR / space
-      (cp >= 0x09   && cp <= 0x0D)   || cp === 0x20   ||
-      // Persian quotation marks « »  (U+00AB, U+00BB)
-      cp === 0x00AB || cp === 0x00BB ||
-      // ASCII digits 0–9
-      (cp >= 0x30   && cp <= 0x39)   ||
-      // ASCII punctuation blocks — explicitly excludes A–Z (41–5A) and a–z (61–7A)
-      (cp >= 0x21   && cp <= 0x2F)   ||   // ! " # $ % & ' ( ) * + , - . /
-      (cp >= 0x3A   && cp <= 0x40)   ||   // : ; < = > ? @
-      (cp >= 0x5B   && cp <= 0x60)   ||   // [ \ ] ^ _ `
-      (cp >= 0x7B   && cp <= 0x7E)   ||   // { | } ~
-      // Arabic & Persian script: letters, harakat, digits ۰–۹, ؟ ، ؛ ٪ …
+      // Whitespace
+      cp === 0x09 || cp === 0x0A || cp === 0x0D || cp === 0x20 ||
+      // ASCII digits 0-9
+      (cp >= 0x30 && cp <= 0x39) ||
+      // ASCII punctuation (no A-Z, no a-z)
+      (cp >= 0x21 && cp <= 0x2F) ||
+      (cp >= 0x3A && cp <= 0x40) ||
+      (cp >= 0x5B && cp <= 0x60) ||
+      (cp >= 0x7B && cp <= 0x7E) ||
+      // Persian/Arabic + supplements
       (cp >= 0x0600 && cp <= 0x06FF) ||
-      (cp >= 0x0750 && cp <= 0x077F) ||   // Arabic Supplement
-      (cp >= 0x08A0 && cp <= 0x08FF) ||   // Arabic Extended-A
-      // Arabic Presentation Forms (ligatures like ﷲ, lam-alef, etc.)
+      (cp >= 0x0750 && cp <= 0x077F) ||
+      (cp >= 0x08A0 && cp <= 0x08FF) ||
       (cp >= 0xFB50 && cp <= 0xFDFF) ||
       (cp >= 0xFE70 && cp <= 0xFEFF) ||
-      // General & typographic punctuation: — … ‌ ‍ • ‹ › „ " " ' '
       (cp >= 0x2000 && cp <= 0x206F) ||
-      // Miscellaneous symbols & dingbats (✓ ★ ♦ etc.)
       (cp >= 0x2600 && cp <= 0x27BF) ||
-      // Emoji: Misc Pictographs → Supplemental Symbols & Pictographs
       (cp >= 0x1F300 && cp <= 0x1FAFF) ||
-      // Emoji variation selectors (U+FE00–FE0F)
       (cp >= 0xFE00 && cp <= 0xFE0F)
     );
   }).join('');
 
-  return filtered
-    .replace(/ {2,}/g, ' ')       // collapse accidental double-spaces after removal
-    .replace(/\n{3,}/g, '\n\n')   // max two consecutive newlines
+  // Restore protected words
+  let result = filtered;
+  protected_words.forEach((word, idx) => {
+    result = result.replace(`__${idx}__`, word);
+  });
+
+  return result
+    .replace(/ {2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -516,14 +525,14 @@ export async function POST(request: NextRequest) {
         max_tokens: 1024,
         temperature: 0.7,
       });
-      reply = sanitizePersianResponse(completion.choices[0]?.message?.content || 'لحظه‌ای صبر کن...');
+      reply = filterResponse(completion.choices[0]?.message?.content || 'لحظه‌ای صبر کن...');
     } catch (err: any) {
       if (err?.status !== 429 && err?.status !== 503 && err?.status !== 529) throw err;
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
       const gemini = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: systemFinal });
       const chat = gemini.startChat({ history: buildGeminiHistory(groqMessages.slice(0, -1)) });
       const result = await chat.sendMessage(message);
-      reply = sanitizePersianResponse(result.response.text() || 'لحظه‌ای صبر کن...');
+      reply = filterResponse(result.response.text() || 'لحظه‌ای صبر کن...');
     }
 
     // ۲. استخراج‌های parallel با مدل سبک‌تر (بعد از reply تا rate-limit نخوریم)
