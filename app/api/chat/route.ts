@@ -360,6 +360,26 @@ function buildProfileContext(profile: Record<string, any>): string {
   ].join('\n');
 }
 
+function classifyIntent(message: string, history: Array<{ role: string; content: string }>): { type: string; maxTokens: number; temperature: number } {
+  const identityCrisisKeywords = ['نمی‌دونم کیم', 'گم شدم', 'دیگه نمی‌دونم', 'کی هستم'];
+  const emotionalKeywords = [
+    'تنهام', 'افسرده', 'گریه', 'دردم', 'فوت', 'مرد', 'از دست دادم',
+    'نمی‌تونم', 'خسته', 'ناامید', 'بدم میاد از خودم', 'شرم',
+  ];
+  const factualKeywords = [
+    'اذان', 'نماز چند', 'زکات', 'ساعت', 'تاریخ', 'چطور محاسبه',
+    'چقدر', 'کجا', 'چه روزی', 'چه وقت',
+  ];
+
+  if (identityCrisisKeywords.some(k => message.includes(k)))
+    return { type: 'identity_crisis', maxTokens: 150, temperature: 0.7 };
+  if (emotionalKeywords.some(k => message.includes(k)))
+    return { type: 'emotional', maxTokens: 200, temperature: 0.8 };
+  if (factualKeywords.some(k => message.includes(k)))
+    return { type: 'factual', maxTokens: 100, temperature: 0.2 };
+  return { type: 'general', maxTokens: 300, temperature: 0.7 };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -423,7 +443,9 @@ export async function POST(request: NextRequest) {
     const history = rawHistory ? [...rawHistory].reverse() : [];
 
     const { checkinInjection, shouldUpdateCheckin } = getCheckinContext(currentProfile);
-    const systemFinal = buildProfileContext(currentProfile) + checkinInjection + SYSTEM_PROMPT;
+    const intent = classifyIntent(message, history);
+    const intentNote = `\n[نوع پیام: ${intent.type} — قوانین مربوطه را اجرا کن]\n`;
+    const systemFinal = buildProfileContext(currentProfile) + checkinInjection + intentNote + SYSTEM_PROMPT;
 
     const groqMessages = [
       ...history.map((h: any) => ({ role: h.role as 'user' | 'assistant', content: h.content })),
@@ -436,8 +458,8 @@ export async function POST(request: NextRequest) {
       const completion = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'system', content: systemFinal }, ...groqMessages],
-        max_tokens: 1024,
-        temperature: 0.7,
+        max_tokens: intent.maxTokens,
+        temperature: intent.temperature,
       });
       reply = filterResponse(completion.choices[0]?.message?.content || 'لحظه‌ای صبر کن...');
     } catch (err: any) {
