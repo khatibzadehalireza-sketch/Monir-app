@@ -360,6 +360,21 @@ function buildProfileContext(profile: Record<string, any>): string {
   ].join('\n');
 }
 
+function repairShortQuery(message: string, history: Array<{ role: string; content: string }>): string {
+  const trimmed = message.trim();
+  const isShort = trimmed.length < 15;
+  const isAmbiguous = !trimmed.includes(' ') || (trimmed.endsWith('؟') && trimmed.length < 10);
+
+  if (isShort && isAmbiguous && history.length > 0) {
+    const lastUserMsg = [...history].reverse().find(h => h.role === 'user');
+    if (lastUserMsg && lastUserMsg.content !== message) {
+      const lastTopic = lastUserMsg.content.slice(0, 40).replace(/\n/g, ' ').trim();
+      return `[کاربر در ادامه مکالمه‌ای که درباره "${lastTopic}..." بود پرسید: "${message}"]`;
+    }
+  }
+  return message;
+}
+
 function classifyIntent(message: string, history: Array<{ role: string; content: string }>): { type: string; maxTokens: number; temperature: number } {
   const identityCrisisKeywords = ['نمی‌دونم کیم', 'گم شدم', 'دیگه نمی‌دونم', 'کی هستم'];
   const emotionalKeywords = [
@@ -447,9 +462,10 @@ export async function POST(request: NextRequest) {
     const intentNote = `\n[نوع پیام: ${intent.type} — قوانین مربوطه را اجرا کن]\n`;
     const systemFinal = buildProfileContext(currentProfile) + checkinInjection + intentNote + SYSTEM_PROMPT;
 
+    const repairedMessage = repairShortQuery(message, history);
     const groqMessages = [
       ...history.map((h: any) => ({ role: h.role as 'user' | 'assistant', content: h.content })),
-      { role: 'user' as const, content: message },
+      { role: 'user' as const, content: repairedMessage },
     ];
 
     // ۱. جواب اصلی (Groq → Gemini fallback)
