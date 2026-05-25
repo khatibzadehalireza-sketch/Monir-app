@@ -515,6 +515,21 @@ function buildPrayerContext(timings: Record<string, string>, city: string | null
   );
 }
 
+function deriveWhatWorked(
+  topic: string | undefined,
+  hopeDelta: number | null,
+  anxietyDelta: number | null,
+): string | null {
+  const improved = (hopeDelta ?? 0) > 0 || (anxietyDelta ?? 0) < 0;
+  if (!improved) return null;
+  if (topic === 'ایمان' || topic === 'هویت')           return 'تقویت ایمان و معنا';
+  if (topic === 'سوگ'   || topic === 'خانواده')         return 'همدلی و حضور عاطفی';
+  if (topic === 'اضطراب' || topic === 'افسردگی')        return 'شنیدن فعال و تایید احساسات';
+  if (topic === 'تنهایی')                               return 'ایجاد احساس دیده‌شدن';
+  if (topic === 'ازدواج' || topic === 'روابط')          return 'راهنمایی رابطه‌ای';
+  return 'حضور همراه';
+}
+
 function classifyIntent(message: string, history: Array<{ role: string; content: string }>): { type: string; maxTokens: number; temperature: number } {
   const identityCrisisKeywords = ['نمی‌دونم کیم', 'گم شدم', 'دیگه نمی‌دونم', 'کی هستم'];
   const emotionalKeywords = [
@@ -570,9 +585,9 @@ export async function POST(request: NextRequest) {
     const ipCountry = request.headers.get('x-vercel-ip-country') ?? null;
     const ipCity    = request.headers.get('x-vercel-ip-city')    ?? null;
 
-    // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی در parallel ---
+    // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی + before scores در parallel ---
     const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
-    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings] = await Promise.all([
+    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('conversations').select('role, content').eq('user_id', userId)
@@ -581,12 +596,22 @@ export async function POST(request: NextRequest) {
       isPrayerTimeQuery && ipCity
         ? fetchPrayerTimes(ipCity, ipCountry ?? '')
         : Promise.resolve(null),
+      sessionMessageCount >= 5
+        ? supabase.from('conversation_metadata')
+            .select('before_hope, before_anxiety')
+            .eq('session_id', sessionId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
-    if (countResult.error)   console.error('[supabase] message_counts:', countResult.error.message);
-    if (profileResult.error) console.error('[supabase] user_profiles:', profileResult.error.message);
-    if (historyResult.error) console.error('[supabase] conversations:', historyResult.error.message);
-    if (identityResult.error) console.error('[supabase] user_identity:', identityResult.error.message);
+    if (countResult.error)       console.error('[supabase] message_counts:', countResult.error.message);
+    if (profileResult.error)     console.error('[supabase] user_profiles:', profileResult.error.message);
+    if (historyResult.error)     console.error('[supabase] conversations:', historyResult.error.message);
+    if (identityResult.error)    console.error('[supabase] user_identity:', identityResult.error.message);
+    if ((sessionBeforeResult as any)?.error) console.error('[supabase] before_scores:', (sessionBeforeResult as any).error.message);
+
+    const beforeRow = (sessionBeforeResult as any)?.data as
+      { before_hope: number | null; before_anxiety: number | null } | null;
 
     const countRow   = countResult.data;
     const profileRow = profileResult.data;
@@ -815,31 +840,50 @@ export async function POST(request: NextRequest) {
     }
 
     // ── conversation_metadata: خلاصه جلسه (upsert — یک رکورد در session_id) ──
-    if (newSessionSummary && Object.keys(newSessionSummary).length > 0) {
+    if (newEmotionData || newSessionSummary) {
       const clampF = (v: unknown, lo: number, hi: number): number | undefined => {
         const n = typeof v === 'number' ? Math.round(v) : undefined;
         return n !== undefined ? Math.max(lo, Math.min(hi, n)) : undefined;
       };
+
+      // Intervention outcome deltas (only when we have both before and after)
+      const afterHope    = clampF(newEmotionData?.hope_score,    0, 10) ?? null;
+      const afterAnxiety = clampF(newEmotionData?.anxiety_score, 0, 10) ?? null;
+      const hopeDelta    = sessionMessageCount >= 5 && beforeRow?.before_hope    != null && afterHope    != null
+        ? afterHope    - beforeRow.before_hope    : null;
+      const anxietyDelta = sessionMessageCount >= 5 && beforeRow?.before_anxiety != null && afterAnxiety != null
+        ? afterAnxiety - beforeRow.before_anxiety : null;
+
       supabase.from('conversation_metadata').upsert({
-        user_id:             userId,
-        session_id:          sessionId,
-        main_topic:          newSessionSummary.main_topic          ?? null,
-        sub_topic:           newSessionSummary.sub_topic           ?? null,
-        dominant_emotions:   newSessionSummary.dominant_emotions   ?? null,
-        emotion_intensity:   newSessionSummary.emotion_intensity   ?? null,
-        emotional_volatility: newSessionSummary.emotional_volatility ?? null,
-        semantic_topics:     newSessionSummary.semantic_topics     ?? null,
-        urgency:             newSessionSummary.urgency             ?? null,
-        session_depth:       clampF(newSessionSummary.session_depth, 1, 5),
-        message_count:       sessionMessageCount,
-        // Feature 3: emotion scores from extractEmotionScores
-        anxiety_score:       clampF(newEmotionData?.anxiety_score,    0, 10),
-        loneliness_score:    clampF(newEmotionData?.loneliness_score, 0, 10),
-        hope_score:          clampF(newEmotionData?.hope_score,       0, 10),
-        guilt_score:         clampF(newEmotionData?.guilt_score,      0, 10),
-        dominant_emotion:    newEmotionData?.dominant_emotion   ?? null,
-        spiritual_state:     newEmotionData?.spiritual_state    ?? null,
-        session_summary:     newEmotionData?.session_summary    ?? null,
+        user_id:              userId,
+        session_id:           sessionId,
+        main_topic:           newSessionSummary?.main_topic          ?? null,
+        sub_topic:            newSessionSummary?.sub_topic           ?? null,
+        dominant_emotions:    newSessionSummary?.dominant_emotions   ?? null,
+        emotion_intensity:    newSessionSummary?.emotion_intensity   ?? null,
+        emotional_volatility: newSessionSummary?.emotional_volatility ?? null,
+        semantic_topics:      newSessionSummary?.semantic_topics     ?? null,
+        urgency:              newSessionSummary?.urgency             ?? null,
+        session_depth:        clampF(newSessionSummary?.session_depth, 1, 5),
+        message_count:        sessionMessageCount,
+        // emotion scores (feature 3)
+        anxiety_score:        clampF(newEmotionData?.anxiety_score,    0, 10),
+        loneliness_score:     clampF(newEmotionData?.loneliness_score, 0, 10),
+        hope_score:           clampF(newEmotionData?.hope_score,       0, 10),
+        guilt_score:          clampF(newEmotionData?.guilt_score,      0, 10),
+        dominant_emotion:     newEmotionData?.dominant_emotion  ?? null,
+        spiritual_state:      newEmotionData?.spiritual_state   ?? null,
+        session_summary:      newEmotionData?.session_summary   ?? null,
+        // intervention outcomes — undefined fields are omitted by JSON.stringify → DB value preserved
+        before_hope:    sessionMessageCount === 1 ? clampF(newEmotionData?.hope_score,    0, 10) : undefined,
+        before_anxiety: sessionMessageCount === 1 ? clampF(newEmotionData?.anxiety_score, 0, 10) : undefined,
+        after_hope:     sessionMessageCount >= 5  ? afterHope    ?? undefined : undefined,
+        after_anxiety:  sessionMessageCount >= 5  ? afterAnxiety ?? undefined : undefined,
+        hope_delta:     hopeDelta    != null ? hopeDelta    : undefined,
+        anxiety_delta:  anxietyDelta != null ? anxietyDelta : undefined,
+        what_worked:    sessionMessageCount >= 5
+          ? deriveWhatWorked(newSessionSummary?.main_topic, hopeDelta, anxietyDelta) ?? undefined
+          : undefined,
       }, { onConflict: 'session_id' })
         .then(({ error }) => { if (error) console.error('[session upsert]', error.message); });
     }
