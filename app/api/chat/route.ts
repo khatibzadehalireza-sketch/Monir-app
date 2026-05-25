@@ -700,7 +700,14 @@ export async function POST(request: NextRequest) {
     const nameHint      = (userName && !currentProfile.name)
       ? `\n【اسم کاربر: ${userName} — در مکالمه از این اسم استفاده کن】\n`
       : '';
-    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + SYSTEM_PROMPT;
+
+    const lastSeen = currentIdentity.last_seen ? new Date(currentIdentity.last_seen) : null;
+    const daysSinceSeen = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / 86_400_000) : null;
+    const freshStartNote = (daysSinceSeen !== null && daysSinceSeen >= 30)
+      ? `\n【این کاربر ${daysSinceSeen} روز غایب بوده — با گرمی و بدون ارجاع به گذشته شروع کن، انگار اولین مکالمه‌ست】\n`
+      : '';
+
+    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + freshStartNote + SYSTEM_PROMPT;
 
     const repairedMessage = repairShortQuery(message, history);
     const groqMessages = [
@@ -1007,7 +1014,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── user_identity: هویت دموگرافیک (fire-and-forget) ─────────────────────
-    if (newIdentityData || (!currentIdentity.user_id) || (consentGiven && !currentIdentity.consent_given)) {
+    if (newIdentityData || (!currentIdentity.user_id) || (consentGiven && !currentIdentity.consent_given) || sessionMessageCount === 1) {
       const { changed: _c, ...identityFields } = newIdentityData ?? { changed: false };
       const identityMerged: Record<string, any> = {
         ...currentIdentity,
@@ -1024,6 +1031,7 @@ export async function POST(request: NextRequest) {
         city:          ipCity    ?? currentIdentity.city    ?? null,
         consent_given: consentGiven ?? currentIdentity.consent_given ?? undefined,
         consent_date:  consentGiven ? (consentDate ?? currentIdentity.consent_date ?? null) : (currentIdentity.consent_date ?? undefined),
+        last_seen:     now,
       };
       supabase.from('user_identity')
         .upsert(identityMerged, { onConflict: 'user_id' })
