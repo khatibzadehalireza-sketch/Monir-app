@@ -513,6 +513,7 @@ export async function POST(request: NextRequest) {
     const userId = body.userId || 'guest';
     const sessionStartTime: string = body.sessionStartTime || new Date().toISOString();
     const sessionMessageCount: number = body.sessionMessageCount || 1;
+    const userName: string | undefined = typeof body.userName === 'string' ? body.userName.trim() || undefined : undefined;
     const deviceType = detectDeviceType(request.headers.get('user-agent') || '');
     const languageDetected = detectLanguage(message);
     
@@ -588,7 +589,10 @@ export async function POST(request: NextRequest) {
     const intentNote = `\n[نوع پیام: ${intent.type} — قوانین مربوطه را اجرا کن]\n`;
     const subtleHint    = buildSubtleQuestionsHint(currentProfile, currentIdentity);
     const prayerContext = prayerTimings ? buildPrayerContext(prayerTimings, cityForPrayer) : '';
-    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + checkinInjection + subtleHint + intentNote + SYSTEM_PROMPT;
+    const nameHint      = (userName && !currentProfile.name)
+      ? `\n【اسم کاربر: ${userName} — در مکالمه از این اسم استفاده کن】\n`
+      : '';
+    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + SYSTEM_PROMPT;
 
     const repairedMessage = repairShortQuery(message, history);
     const groqMessages = [
@@ -841,7 +845,7 @@ export async function POST(request: NextRequest) {
         .then(({ error }) => { if (error) console.error('[identity upsert]', error.message); });
     }
 
-    if (newProfileData || shouldUpdateCheckin || !currentProfile.last_checkin) {
+    if (newProfileData || shouldUpdateCheckin || !currentProfile.last_checkin || (userName && !currentProfile.name)) {
       const extracted = newProfileData
         ? Object.fromEntries(Object.entries(newProfileData).filter(([k]) => k !== 'changed'))
         : {};
@@ -851,6 +855,7 @@ export async function POST(request: NextRequest) {
         ...extracted,
         user_id:    userId,
         updated_at: now,
+        name:       currentProfile.name ?? (extracted as any).name ?? userName ?? null,
         // last_checkin: set on first message; only refreshed when 7-day checkin fires
         last_checkin: (!currentProfile.last_checkin || shouldUpdateCheckin)
           ? now

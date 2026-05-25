@@ -13,6 +13,10 @@ export default function App() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingName, setOnboardingName] = useState("");
+  const [onboardingAge, setOnboardingAge] = useState("");
+  const [userName, setUserName] = useState("");
 
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -20,11 +24,29 @@ export default function App() {
   const msgCount = useRef(0);
 
   useEffect(() => {
+    if (!localStorage.getItem("monir_onboarding_done")) {
+      setShowOnboarding(true);
+    } else {
+      setUserName(localStorage.getItem("monir_user_name") || "");
+    }
+  }, []);
+
+  useEffect(() => {
     if (screen === "chat" && messages.length === 0)
       setTimeout(() => setMessages([{ role: "assistant", content: OPENING, id: "0" }]), 600);
   }, [screen]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
+
+  const completeOnboarding = useCallback(() => {
+    const name = onboardingName.trim();
+    const age  = onboardingAge.trim();
+    if (name) localStorage.setItem("monir_user_name", name);
+    if (age)  localStorage.setItem("monir_user_age",  age);
+    localStorage.setItem("monir_onboarding_done", "true");
+    setUserName(name);
+    setShowOnboarding(false);
+  }, [onboardingName, onboardingAge]);
 
   const goToChat = useCallback(() => {
     setSilLeaving(true);
@@ -60,6 +82,7 @@ export default function App() {
           })(),
           sessionStartTime: sessionStart.current,
           sessionMessageCount: msgCount.current,
+          userName: userName || undefined,
         }),
       });
       const data = await res.json();
@@ -239,6 +262,48 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* ── ONBOARDING OVERLAY ── */}
+      {showOnboarding && (
+        <div className="ob-overlay">
+          <div className="ob-card">
+            <div className="ob-logo"><span>✦</span></div>
+            <h1 className="ob-title">منیر</h1>
+            <p className="ob-sub">همراه معنوی تو<br/><span className="ob-sub-en">Your Spiritual Companion</span></p>
+
+            <div className="ob-fields">
+              <div className="ob-field">
+                <label className="ob-label">اسم <span className="ob-label-en">/ Name</span> <span className="ob-opt">(اختیاری / optional)</span></label>
+                <input
+                  className="ob-input"
+                  type="text"
+                  placeholder="اسمت چیه؟ / What's your name?"
+                  value={onboardingName}
+                  onChange={e => setOnboardingName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && completeOnboarding()}
+                  autoComplete="off"
+                />
+              </div>
+              <div className="ob-field">
+                <label className="ob-label">سن <span className="ob-label-en">/ Age</span> <span className="ob-opt">(اختیاری / optional)</span></label>
+                <input
+                  className="ob-input"
+                  type="number"
+                  placeholder="سنت چنده؟ / How old are you?"
+                  value={onboardingAge}
+                  onChange={e => setOnboardingAge(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && completeOnboarding()}
+                  min="10" max="100"
+                />
+              </div>
+            </div>
+
+            <button className="ob-btn" onClick={completeOnboarding}>
+              شروع کن &nbsp;/&nbsp; Start
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -532,6 +597,89 @@ export default function App() {
           .tnav { padding: 12px 16px; }
           .htxt { padding-top: 4px; }
         }
+
+        /* ── ONBOARDING ── */
+        .ob-overlay {
+          position: fixed; inset: 0; z-index: 100;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(2,6,18,0.80);
+          backdrop-filter: blur(10px);
+          animation: obFade .35s ease both;
+        }
+        @keyframes obFade { from { opacity:0; } to { opacity:1; } }
+
+        .ob-card {
+          width: min(360px, 92vw);
+          background: rgba(6,10,26,0.95);
+          border: 1px solid rgba(212,160,23,0.28);
+          border-radius: 26px;
+          padding: 38px 28px 34px;
+          display: flex; flex-direction: column; align-items: center; gap: 14px;
+          box-shadow: 0 12px 70px rgba(0,0,0,0.75), 0 0 80px rgba(212,160,23,0.06);
+          animation: obSlide .45s cubic-bezier(.22,.68,0,1.2) both;
+        }
+        @keyframes obSlide {
+          from { transform: translateY(28px); opacity:0; }
+          to   { transform: none; opacity:1; }
+        }
+
+        .ob-logo {
+          width: 58px; height: 58px; border-radius: 50%;
+          background: radial-gradient(circle at 36% 36%, #fff5d0, #d4a017 42%, #7a5200 88%);
+          display: flex; align-items: center; justify-content: center; font-size: 22px;
+          box-shadow: 0 0 22px rgba(212,160,23,0.65), 0 0 50px rgba(212,160,23,0.28);
+          animation: lp 3.2s ease-in-out infinite;
+        }
+
+        .ob-title {
+          font-size: 46px; font-weight: 700; color: #d4a017;
+          text-shadow: 0 0 34px rgba(212,160,23,0.55); margin: 0;
+        }
+        .ob-sub {
+          font-size: 13px; color: rgba(212,160,23,0.50);
+          text-align: center; line-height: 1.7;
+        }
+        .ob-sub-en { font-size: 11px; color: rgba(212,160,23,0.32); }
+
+        .ob-fields { width: 100%; display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+        .ob-field  { display: flex; flex-direction: column; gap: 6px; }
+
+        .ob-label {
+          font-size: 12.5px; color: rgba(212,160,23,0.65);
+          text-align: right; direction: rtl;
+        }
+        .ob-label-en { color: rgba(212,160,23,0.40); }
+        .ob-opt { font-size: 11px; color: rgba(212,160,23,0.30); }
+
+        .ob-input {
+          width: 100%;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(212,160,23,0.22);
+          border-radius: 12px; padding: 12px 14px;
+          color: #e8dab5; font-size: 14px;
+          font-family: 'Vazirmatn', sans-serif;
+          text-align: right; direction: rtl; outline: none;
+          transition: border-color .25s, box-shadow .25s;
+        }
+        .ob-input:focus {
+          border-color: rgba(212,160,23,0.55);
+          box-shadow: 0 0 0 2px rgba(212,160,23,0.08);
+        }
+        .ob-input::placeholder { color: rgba(212,160,23,0.22); }
+        .ob-input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
+
+        .ob-btn {
+          width: 100%; margin-top: 8px; padding: 14px;
+          background: #d4a017; color: #06080f;
+          border: none; border-radius: 14px;
+          font-size: 15px; font-weight: 600;
+          font-family: 'Vazirmatn', sans-serif; cursor: pointer;
+          box-shadow: 0 0 22px rgba(212,160,23,0.50);
+          transition: background .2s, transform .1s;
+          letter-spacing: .02em;
+        }
+        .ob-btn:hover  { background: #e8b520; }
+        .ob-btn:active { transform: scale(.97); }
       `}</style>
     </>
   );
