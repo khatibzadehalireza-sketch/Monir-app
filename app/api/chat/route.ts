@@ -455,6 +455,37 @@ function repairShortQuery(message: string, history: Array<{ role: string; conten
   return message;
 }
 
+const PRAYER_TIME_RE = /اذان|اوقات شرعی|وقت نماز|ساعت نماز|نماز.*ساعت|ساعت.*نماز/;
+
+async function fetchPrayerTimes(city: string, country: string): Promise<Record<string, string> | null> {
+  try {
+    const url =
+      `https://api.aladhan.com/v1/timingsByCity` +
+      `?city=${encodeURIComponent(city)}` +
+      `&country=${encodeURIComponent(country)}` +
+      `&method=2`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data?.data?.timings as Record<string, string>) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildPrayerContext(timings: Record<string, string>, city: string | null): string {
+  const order = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+  const names: Record<string, string> = {
+    Fajr: 'صبح', Sunrise: 'طلوع', Dhuhr: 'ظهر', Asr: 'عصر', Maghrib: 'مغرب', Isha: 'عشا',
+  };
+  const lines = order.filter(k => timings[k]).map(k => `${names[k]}: ${timings[k]}`).join(' | ');
+  return (
+    `\n【اوقات شرعی امروز${city ? ` — ${city}` : ''}】\n` +
+    `${lines}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`
+  );
+}
+
 function classifyIntent(message: string, history: Array<{ role: string; content: string }>): { type: string; maxTokens: number; temperature: number } {
   const identityCrisisKeywords = ['نمی‌دونم کیم', 'گم شدم', 'دیگه نمی‌دونم', 'کی هستم'];
   const emotionalKeywords = [
@@ -509,13 +540,17 @@ export async function POST(request: NextRequest) {
     const ipCountry = request.headers.get('x-vercel-ip-country') ?? null;
     const ipCity    = request.headers.get('x-vercel-ip-city')    ?? null;
 
-    // --- لیمیت + پروفایل + تاریخچه + هویت در parallel ---
-    const [countResult, profileResult, historyResult, identityResult] = await Promise.all([
+    // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی در parallel ---
+    const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
+    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('conversations').select('role, content').eq('user_id', userId)
         .in('role', ['user', 'assistant']).order('created_at', { ascending: false }).limit(10),
       supabase.from('user_identity').select('*').eq('user_id', userId).maybeSingle(),
+      isPrayerTimeQuery && ipCity
+        ? fetchPrayerTimes(ipCity, ipCountry ?? '')
+        : Promise.resolve(null),
     ]);
 
     if (countResult.error)   console.error('[supabase] message_counts:', countResult.error.message);
@@ -540,11 +575,20 @@ export async function POST(request: NextRequest) {
     const currentIdentity: Record<string, any> = identityResult.data ?? {};
     const history = rawHistory ? [...rawHistory].reverse() : [];
 
+    // اوقات شرعی: اگه ipCity نداشتیم، از شهر ذخیره‌شده در هویت استفاده کن
+    const cityForPrayer    = ipCity    ?? currentIdentity.city    ?? null;
+    const countryForPrayer = ipCountry ?? currentIdentity.country ?? '';
+    let prayerTimings = rawPrayerTimings;
+    if (isPrayerTimeQuery && !prayerTimings && cityForPrayer) {
+      prayerTimings = await fetchPrayerTimes(cityForPrayer, countryForPrayer);
+    }
+
     const { checkinInjection, shouldUpdateCheckin } = getCheckinContext(currentProfile);
     const intent = classifyIntent(message, history);
     const intentNote = `\n[نوع پیام: ${intent.type} — قوانین مربوطه را اجرا کن]\n`;
-    const subtleHint = buildSubtleQuestionsHint(currentProfile, currentIdentity);
-    const systemFinal = buildProfileContext(currentProfile) + checkinInjection + subtleHint + intentNote + SYSTEM_PROMPT;
+    const subtleHint    = buildSubtleQuestionsHint(currentProfile, currentIdentity);
+    const prayerContext = prayerTimings ? buildPrayerContext(prayerTimings, cityForPrayer) : '';
+    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + checkinInjection + subtleHint + intentNote + SYSTEM_PROMPT;
 
     const repairedMessage = repairShortQuery(message, history);
     const groqMessages = [
