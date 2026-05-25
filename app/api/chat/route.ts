@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, TaskType } from '@google/generative-ai';
 import { getSupabase } from '@/lib/supabase';
 import { extractEmotionScores } from '@/lib/extractEmotions';
 
@@ -602,6 +602,34 @@ function classifyIntent(message: string, history: Array<{ role: string; content:
   return { type: 'general', maxTokens: 300, temperature: 0.7 };
 }
 
+async function generateEmotionEmbedding(
+  emotion: EmotionData,
+  profile: Record<string, any>,
+): Promise<number[] | null> {
+  const parts: string[] = [];
+  if (emotion.anxiety_score    != null) parts.push(`اضطراب: ${emotion.anxiety_score}/10`);
+  if (emotion.loneliness_score != null) parts.push(`تنهایی: ${emotion.loneliness_score}/10`);
+  if (emotion.hope_score       != null) parts.push(`امید: ${emotion.hope_score}/10`);
+  if (emotion.guilt_score      != null) parts.push(`احساس گناه: ${emotion.guilt_score}/10`);
+  if (emotion.dominant_emotion)         parts.push(`احساس غالب: ${emotion.dominant_emotion}`);
+  if (emotion.spiritual_state)          parts.push(`وضعیت معنوی: ${emotion.spiritual_state}`);
+  if (emotion.session_summary)          parts.push(emotion.session_summary);
+  if (profile.recurring_struggles?.length)
+    parts.push(`چالش‌ها: ${(profile.recurring_struggles as string[]).slice(0, 3).join(', ')}`);
+  if (profile.topic_tags?.length)
+    parts.push(`موضوعات: ${(profile.topic_tags as string[]).slice(0, 5).join(', ')}`);
+  if (parts.length === 0) return null;
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+  const result = await model.embedContent({
+    content: { role: 'user', parts: [{ text: parts.join(' | ') }] },
+    taskType: TaskType.SEMANTIC_SIMILARITY,
+    outputDimensionality: 384,
+  });
+  return result.embedding.values;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -1076,6 +1104,19 @@ export async function POST(request: NextRequest) {
         .from('user_profiles')
         .upsert(merged, { onConflict: 'user_id' });
       if (profileSaveErr) console.error('[supabase] profile upsert:', profileSaveErr.message);
+    }
+
+    // ── emotion embedding: بردار ۳۸۴ بعدی از وضعیت احساسی (fire-and-forget) ──
+    if (newEmotionData) {
+      const profileForEmbedding = currentProfile;
+      generateEmotionEmbedding(newEmotionData, profileForEmbedding)
+        .then(embedding => {
+          if (!embedding) return;
+          return supabase.from('user_profiles')
+            .upsert({ user_id: userId, emotion_embedding: embedding, updated_at: now }, { onConflict: 'user_id' })
+            .then(({ error }) => { if (error) console.error('[emotion embedding]', error.message); });
+        })
+        .catch(err => console.error('[emotion embedding]', err?.message));
     }
 
     return NextResponse.json({ reply });
