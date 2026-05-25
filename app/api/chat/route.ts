@@ -243,6 +243,32 @@ interface LifeEventData {
   support_network?: string | null;
 }
 
+// تشخیص «ناگفته‌ها» — موضوعات فراری، جمله‌های ناتمام، کلمات جایگزین سبک‌تر
+const UNSAID_DETECT_PROMPT = `تحلیل‌گر ناگفته‌ها هستی. تاریخچه کوتاه مکالمه و پیام آخر کاربر را بررسی کن.
+
+فقط اگه یکی از موارد زیر را واقعاً تشخیص دادی جواب بده، وگرنه {"detected": false} برگردون:
+
+۱. avoided_topics: موضوعی که منیر مطرح کرد ولی کاربر ازش فرار کرد یا تغییر موضوع داد
+۲. half_mentioned: جمله‌ای که شروع شد ولی ناتمام موند («یه چیزی هست ولی...»، «نمی‌خوام بگم»، «مهم نیست»)
+۳. softened_words: کلمه‌ای که جای کلمه سنگین‌تری نشسته («خسته» به جای «افسرده»، «یکم ناراحتم» به جای «خیلی دردناکه»، «مشکل کوچیکی دارم» به جای بحران)
+
+اگه موردی تشخیص دادی:
+{
+  "detected": true,
+  "avoided_topics": ["موضوع فراری — حداکثر ۲ تا"],
+  "half_mentioned": ["اشاره مبهم یا جمله ناتمام — حداکثر ۲ تا"],
+  "softened_words": [{"said": "کلمه گفته‌شده", "likely_meant": "منظور احتمالی"}]
+}
+
+فقط JSON خالص.`;
+
+interface UnsaidData {
+  detected: boolean;
+  avoided_topics?: string[];
+  half_mentioned?: string[];
+  softened_words?: Array<{ said: string; likely_meant: string }>;
+}
+
 interface SessionSummaryData {
   main_topic?: string;
   sub_topic?: string;
@@ -515,6 +541,32 @@ function buildPrayerContext(timings: Record<string, string>, city: string | null
   );
 }
 
+function mergeUnsaidPatterns(
+  existing: Record<string, any> | undefined,
+  incoming: UnsaidData,
+): Record<string, any> {
+  const base = existing ?? { avoided_topics: [], half_mentioned: [], softened_words: [] };
+
+  const avoidedSet = new Set<string>(base.avoided_topics ?? []);
+  (incoming.avoided_topics ?? []).forEach(t => avoidedSet.add(t));
+
+  const halfSet = new Set<string>(base.half_mentioned ?? []);
+  (incoming.half_mentioned ?? []).forEach(t => halfSet.add(t));
+
+  const softenedMap = new Map<string, string>();
+  (base.softened_words ?? []).forEach((sw: { said: string; likely_meant: string }) =>
+    softenedMap.set(sw.said, sw.likely_meant));
+  (incoming.softened_words ?? []).forEach(sw => softenedMap.set(sw.said, sw.likely_meant));
+
+  return {
+    avoided_topics: [...avoidedSet].slice(0, 10),
+    half_mentioned: [...halfSet].slice(0, 6),
+    softened_words: [...softenedMap.entries()]
+      .map(([said, likely_meant]) => ({ said, likely_meant }))
+      .slice(0, 8),
+  };
+}
+
 function deriveWhatWorked(
   topic: string | undefined,
   hopeDelta: number | null,
@@ -682,7 +734,7 @@ export async function POST(request: NextRequest) {
       { role: 'assistant' as const, content: reply   },
     ];
 
-    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled, lifeEventSettled] = await Promise.allSettled([
+    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled, lifeEventSettled, unsaidSettled] = await Promise.allSettled([
 
       // ── پروفایل: حافظه بلندمدت کاربر ──────────────────────────────────────
       (async (): Promise<ProfileData | null> => {
@@ -784,6 +836,28 @@ export async function POST(request: NextRequest) {
         const parsed = JSON.parse(raw) as LifeEventData;
         return parsed.detected ? parsed : null;
       })(),
+
+      // ── ناگفته‌ها: فرار، جمله ناتمام، کلمه جایگزین ─────────────────────────
+      (async (): Promise<UnsaidData | null> => {
+        const recentCtx = [
+          ...history.slice(-3).map((h: any) =>
+            `${h.role === 'user' ? 'کاربر' : 'منیر'}: ${h.content}`),
+          `کاربر: ${message}`,
+        ].join('\n');
+        const res = await groq.chat.completions.create({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: UNSAID_DETECT_PROMPT },
+            { role: 'user',   content: recentCtx },
+          ],
+          max_tokens: 200,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+        const raw    = res.choices[0]?.message?.content || '{"detected":false}';
+        const parsed = JSON.parse(raw) as UnsaidData;
+        return parsed.detected ? parsed : null;
+      })(),
     ]);
 
     const newProfileData    = profileSettled.status    === 'fulfilled' ? profileSettled.value    : null;
@@ -792,6 +866,7 @@ export async function POST(request: NextRequest) {
     const newSessionSummary = sessionSettled.status    === 'fulfilled' ? sessionSettled.value    : null;
     const newEmotionData    = emotionSettled.status    === 'fulfilled' ? emotionSettled.value    : null;
     const newLifeEvent      = lifeEventSettled.status  === 'fulfilled' ? lifeEventSettled.value  : null;
+    const newUnsaidData     = unsaidSettled.status     === 'fulfilled' ? unsaidSettled.value     : null;
 
     if (profileSettled.status    === 'rejected') console.error('[profile]',    (profileSettled    as any).reason?.message);
     if (metadataSettled.status   === 'rejected') console.error('[metadata]',   (metadataSettled   as any).reason?.message);
@@ -799,6 +874,7 @@ export async function POST(request: NextRequest) {
     if (sessionSettled.status    === 'rejected') console.error('[session]',    (sessionSettled    as any).reason?.message);
     if (emotionSettled.status    === 'rejected') console.error('[emotion]',    (emotionSettled    as any).reason?.message);
     if (lifeEventSettled.status  === 'rejected') console.error('[life_event]', (lifeEventSettled  as any).reason?.message);
+    if (unsaidSettled.status     === 'rejected') console.error('[unsaid]',     (unsaidSettled     as any).reason?.message);
     else console.log('[profile] extracted:', JSON.stringify(newProfileData));
 
     const now = new Date().toISOString();
@@ -950,7 +1026,7 @@ export async function POST(request: NextRequest) {
         .then(({ error }) => { if (error) console.error('[identity upsert]', error.message); });
     }
 
-    if (newProfileData || shouldUpdateCheckin || !currentProfile.last_checkin || (userName && !currentProfile.name)) {
+    if (newProfileData || shouldUpdateCheckin || !currentProfile.last_checkin || (userName && !currentProfile.name) || newUnsaidData) {
       const extracted = newProfileData
         ? Object.fromEntries(Object.entries(newProfileData).filter(([k]) => k !== 'changed'))
         : {};
@@ -969,6 +1045,9 @@ export async function POST(request: NextRequest) {
         topic_tags:           mergeUnique(currentProfile.topic_tags,           (extracted as any).topic_tags,           10),
         recurring_struggles:  mergeUnique(currentProfile.recurring_struggles,  (extracted as any).recurring_struggles,   6),
         breakthrough_moments: mergeUnique(currentProfile.breakthrough_moments, (extracted as any).breakthrough_moments,  6),
+        unsaid_patterns:      newUnsaidData
+          ? mergeUnsaidPatterns(currentProfile.unsaid_patterns, newUnsaidData)
+          : (currentProfile.unsaid_patterns ?? null),
       };
 
       if (!merged.summary) {
