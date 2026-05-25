@@ -748,6 +748,33 @@ export async function POST(request: NextRequest) {
         .then(({ error }) => { if (error) console.error('[session upsert]', error.message); });
     }
 
+    // ── trajectory: snapshot ماهانه — یک رکورد در (user_id, month) ──────────
+    {
+      const currentMonth = new Date().toISOString().slice(0, 7); // "2026-05"
+      const tHope      = newEmotionData?.hope_score      ?? null;
+      const tAnxiety   = newEmotionData?.anxiety_score   ?? null;
+      const tLonely    = newEmotionData?.loneliness_score ?? null;
+      const reliText   = (newProfileData?.religiosity_level ?? currentProfile.religiosity_level) as string | undefined;
+      const reliInt    = reliText === 'بالا' ? 3 : reliText === 'متوسط' ? 2 : reliText === 'پایین' ? 1 : null;
+      const tTransform = (tHope !== null && tAnxiety !== null && tLonely !== null)
+        ? Math.round((tHope - (tAnxiety + tLonely) / 2) * 10) / 10
+        : null;
+
+      if (tHope !== null || tAnxiety !== null || tLonely !== null) {
+        supabase.from('trajectory').upsert({
+          user_id:              userId,
+          month:                currentMonth,
+          hope_score:           tHope,
+          anxiety_score:        tAnxiety,
+          loneliness_score:     tLonely,
+          prayer_status:        newProfileData?.prayer_status ?? currentProfile.prayer_status ?? null,
+          religiosity_level:    reliInt,
+          transformation_score: tTransform,
+        }, { onConflict: 'user_id,month' })
+          .then(({ error }) => { if (error) console.error('[trajectory upsert]', error.message); });
+      }
+    }
+
     // ── user_identity: هویت دموگرافیک (fire-and-forget) ─────────────────────
     if (newIdentityData || (!currentIdentity.user_id)) {
       const { changed: _c, ...identityFields } = newIdentityData ?? { changed: false };
