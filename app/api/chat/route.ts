@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSupabase } from '@/lib/supabase';
+import { extractEmotionScores } from '@/lib/extractEmotions';
 
 
 // ─── Safety Layer ───────────────────────────────
@@ -254,6 +255,16 @@ interface IdentityData {
   convert_status?: string;
   generation?: string;
   communication_style?: string;
+}
+
+interface EmotionData {
+  anxiety_score?: number;
+  loneliness_score?: number;
+  hope_score?: number;
+  guilt_score?: number;
+  dominant_emotion?: string;
+  spiritual_state?: string;
+  session_summary?: string;
 }
 
 function filterResponse(text: string): string {
@@ -519,7 +530,13 @@ export async function POST(request: NextRequest) {
     const currentIdentity: Record<string, any> = identityResult.data ?? {};
     const identityIsComplete = !!(currentIdentity.language && currentIdentity.communication_style && currentIdentity.convert_status);
 
-    const [profileSettled, metadataSettled, identitySettled, sessionSettled] = await Promise.allSettled([
+    const sessionMessages = [
+      ...history,
+      { role: 'user' as const,      content: message },
+      { role: 'assistant' as const, content: reply   },
+    ];
+
+    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled] = await Promise.allSettled([
 
       // ── پروفایل: حافظه بلندمدت کاربر ──────────────────────────────────────
       (async (): Promise<ProfileData | null> => {
@@ -601,17 +618,22 @@ export async function POST(request: NextRequest) {
         const raw = res.choices[0]?.message?.content || '{}';
         return JSON.parse(raw) as SessionSummaryData;
       })(),
+
+      // ── اسکور احساسی جلسه (extractEmotionScores از Gemini) ─────────────────
+      extractEmotionScores(sessionMessages) as Promise<EmotionData | null>,
     ]);
 
     const newProfileData    = profileSettled.status  === 'fulfilled' ? profileSettled.value  : null;
     const newMetadata       = metadataSettled.status === 'fulfilled' ? metadataSettled.value : null;
     const newIdentityData   = identitySettled.status === 'fulfilled' ? identitySettled.value : null;
     const newSessionSummary = sessionSettled.status  === 'fulfilled' ? sessionSettled.value  : null;
+    const newEmotionData    = emotionSettled.status  === 'fulfilled' ? emotionSettled.value  : null;
 
     if (profileSettled.status  === 'rejected') console.error('[profile]',  (profileSettled  as any).reason?.message);
     if (metadataSettled.status === 'rejected') console.error('[metadata]', (metadataSettled as any).reason?.message);
     if (identitySettled.status === 'rejected') console.error('[identity]', (identitySettled as any).reason?.message);
     if (sessionSettled.status  === 'rejected') console.error('[session]',  (sessionSettled  as any).reason?.message);
+    if (emotionSettled.status  === 'rejected') console.error('[emotion]',  (emotionSettled  as any).reason?.message);
     else console.log('[profile] extracted:', JSON.stringify(newProfileData));
 
     const now = new Date().toISOString();
@@ -670,6 +692,14 @@ export async function POST(request: NextRequest) {
         urgency:             newSessionSummary.urgency             ?? null,
         session_depth:       clampF(newSessionSummary.session_depth, 1, 5),
         message_count:       sessionMessageCount,
+        // Feature 3: emotion scores from extractEmotionScores
+        anxiety_score:       clampF(newEmotionData?.anxiety_score,    0, 10),
+        loneliness_score:    clampF(newEmotionData?.loneliness_score, 0, 10),
+        hope_score:          clampF(newEmotionData?.hope_score,       0, 10),
+        guilt_score:         clampF(newEmotionData?.guilt_score,      0, 10),
+        dominant_emotion:    newEmotionData?.dominant_emotion   ?? null,
+        spiritual_state:     newEmotionData?.spiritual_state    ?? null,
+        session_summary:     newEmotionData?.session_summary    ?? null,
       }, { onConflict: 'session_id' })
         .then(({ error }) => { if (error) console.error('[session upsert]', error.message); });
     }
