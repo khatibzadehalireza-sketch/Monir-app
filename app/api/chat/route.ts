@@ -214,6 +214,35 @@ const SESSION_SUMMARY_PROMPT = `تحلیل‌گر جلسه هستی. کل مکا
 
 فقط JSON خالص بدون توضیح.`;
 
+// استخراج رویدادهای مهم زندگی — ذخیره در life_events
+const LIFE_EVENT_EXTRACT_PROMPT = `از پیام کاربر، رویدادهای مهم زندگی رو استخراج کن.
+فقط اگه یک رویداد مشخص و مهم ذکر شده باشه — مثل: مرگ عزیزان، طلاق، مهاجرت، بیماری جدی، از دست دادن شغل، ازدواج، تولد فرزند، پایان رابطه، بحران مالی.
+
+اگه هیچ رویداد مهمی نیست: {"detected": false}
+
+در غیر این صورت:
+{
+  "detected": true,
+  "event_type": "نوع رویداد به فارسی، حداکثر ۴ کلمه",
+  "event_year": عدد سال میلادی یا null (سال فعلی: 2026 — «سال پیش» یعنی 2025),
+  "impact_on_faith": عدد صحیح -3 تا +3 (منفی=ایمان ضعیف‌تر، مثبت=ایمان قوی‌تر، 0=نامشخص),
+  "description": "خلاصه یک‌جمله‌ای از رویداد",
+  "current_life_pressure": "فشار فعلی ناشی از این رویداد (اگه مشخص باشه، وگرنه null)",
+  "support_network": "شبکه حمایتی که ذکر شده (اگه مشخص باشه، وگرنه null)"
+}
+
+فقط JSON خالص بدون توضیح.`;
+
+interface LifeEventData {
+  detected: boolean;
+  event_type?: string;
+  event_year?: number | null;
+  impact_on_faith?: number;
+  description?: string;
+  current_life_pressure?: string | null;
+  support_network?: string | null;
+}
+
 interface SessionSummaryData {
   main_topic?: string;
   sub_topic?: string;
@@ -628,7 +657,7 @@ export async function POST(request: NextRequest) {
       { role: 'assistant' as const, content: reply   },
     ];
 
-    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled] = await Promise.allSettled([
+    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled, lifeEventSettled] = await Promise.allSettled([
 
       // ── پروفایل: حافظه بلندمدت کاربر ──────────────────────────────────────
       (async (): Promise<ProfileData | null> => {
@@ -713,19 +742,38 @@ export async function POST(request: NextRequest) {
 
       // ── اسکور احساسی جلسه (extractEmotionScores از Gemini) ─────────────────
       extractEmotionScores(sessionMessages) as Promise<EmotionData | null>,
+
+      // ── رویدادهای مهم زندگی ─────────────────────────────────────────────────
+      (async (): Promise<LifeEventData | null> => {
+        const res = await groq.chat.completions.create({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: LIFE_EVENT_EXTRACT_PROMPT },
+            { role: 'user',   content: message },
+          ],
+          max_tokens: 200,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+        const raw    = res.choices[0]?.message?.content || '{"detected":false}';
+        const parsed = JSON.parse(raw) as LifeEventData;
+        return parsed.detected ? parsed : null;
+      })(),
     ]);
 
-    const newProfileData    = profileSettled.status  === 'fulfilled' ? profileSettled.value  : null;
-    const newMetadata       = metadataSettled.status === 'fulfilled' ? metadataSettled.value : null;
-    const newIdentityData   = identitySettled.status === 'fulfilled' ? identitySettled.value : null;
-    const newSessionSummary = sessionSettled.status  === 'fulfilled' ? sessionSettled.value  : null;
-    const newEmotionData    = emotionSettled.status  === 'fulfilled' ? emotionSettled.value  : null;
+    const newProfileData    = profileSettled.status    === 'fulfilled' ? profileSettled.value    : null;
+    const newMetadata       = metadataSettled.status   === 'fulfilled' ? metadataSettled.value   : null;
+    const newIdentityData   = identitySettled.status   === 'fulfilled' ? identitySettled.value   : null;
+    const newSessionSummary = sessionSettled.status    === 'fulfilled' ? sessionSettled.value    : null;
+    const newEmotionData    = emotionSettled.status    === 'fulfilled' ? emotionSettled.value    : null;
+    const newLifeEvent      = lifeEventSettled.status  === 'fulfilled' ? lifeEventSettled.value  : null;
 
-    if (profileSettled.status  === 'rejected') console.error('[profile]',  (profileSettled  as any).reason?.message);
-    if (metadataSettled.status === 'rejected') console.error('[metadata]', (metadataSettled as any).reason?.message);
-    if (identitySettled.status === 'rejected') console.error('[identity]', (identitySettled as any).reason?.message);
-    if (sessionSettled.status  === 'rejected') console.error('[session]',  (sessionSettled  as any).reason?.message);
-    if (emotionSettled.status  === 'rejected') console.error('[emotion]',  (emotionSettled  as any).reason?.message);
+    if (profileSettled.status    === 'rejected') console.error('[profile]',    (profileSettled    as any).reason?.message);
+    if (metadataSettled.status   === 'rejected') console.error('[metadata]',   (metadataSettled   as any).reason?.message);
+    if (identitySettled.status   === 'rejected') console.error('[identity]',   (identitySettled   as any).reason?.message);
+    if (sessionSettled.status    === 'rejected') console.error('[session]',    (sessionSettled    as any).reason?.message);
+    if (emotionSettled.status    === 'rejected') console.error('[emotion]',    (emotionSettled    as any).reason?.message);
+    if (lifeEventSettled.status  === 'rejected') console.error('[life_event]', (lifeEventSettled  as any).reason?.message);
     else console.log('[profile] extracted:', JSON.stringify(newProfileData));
 
     const now = new Date().toISOString();
@@ -821,6 +869,19 @@ export async function POST(request: NextRequest) {
         }, { onConflict: 'user_id,month' })
           .then(({ error }) => { if (error) console.error('[trajectory upsert]', error.message); });
       }
+    }
+
+    // ── life_events: رویداد مهم زندگی (insert — هر رویداد یک رکورد جدید) ──────
+    if (newLifeEvent) {
+      supabase.from('life_events').insert({
+        user_id:               userId,
+        event_type:            newLifeEvent.event_type            ?? null,
+        event_year:            newLifeEvent.event_year            ?? null,
+        impact_on_faith:       newLifeEvent.impact_on_faith       ?? 0,
+        description:           newLifeEvent.description           ?? null,
+        current_life_pressure: newLifeEvent.current_life_pressure ?? null,
+        support_network:       newLifeEvent.support_network       ?? null,
+      }).then(({ error }) => { if (error) console.error('[life_event insert]', error.message); });
     }
 
     // ── user_identity: هویت دموگرافیک (fire-and-forget) ─────────────────────
