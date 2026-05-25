@@ -13,6 +13,8 @@ export default function App() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
+  const [consentExpanded, setConsentExpanded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingAge, setOnboardingAge] = useState("");
@@ -24,7 +26,9 @@ export default function App() {
   const msgCount = useRef(0);
 
   useEffect(() => {
-    if (!localStorage.getItem("monir_onboarding_done")) {
+    if (!localStorage.getItem("monir_consent_given")) {
+      setShowConsent(true);
+    } else if (!localStorage.getItem("monir_onboarding_done")) {
       setShowOnboarding(true);
     } else {
       setUserName(localStorage.getItem("monir_user_name") || "");
@@ -37,6 +41,18 @@ export default function App() {
   }, [screen]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
+
+  const handleConsent = useCallback(() => {
+    const date = new Date().toISOString();
+    localStorage.setItem("monir_consent_given", "true");
+    localStorage.setItem("monir_consent_date", date);
+    setShowConsent(false);
+    if (!localStorage.getItem("monir_onboarding_done")) {
+      setShowOnboarding(true);
+    } else {
+      setUserName(localStorage.getItem("monir_user_name") || "");
+    }
+  }, []);
 
   const completeOnboarding = useCallback(() => {
     const name = onboardingName.trim();
@@ -83,6 +99,8 @@ export default function App() {
           sessionStartTime: sessionStart.current,
           sessionMessageCount: msgCount.current,
           userName: userName || undefined,
+          consentGiven: localStorage.getItem("monir_consent_given") === "true" ? true : undefined,
+          consentDate: localStorage.getItem("monir_consent_date") || undefined,
         }),
       });
       const data = await res.json();
@@ -262,6 +280,36 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* ── CONSENT OVERLAY ── */}
+      {showConsent && (
+        <div className="cn-overlay">
+          <div className="cn-card">
+            <div className="cn-logo"><span>✦</span></div>
+            <h2 className="cn-title">منیر</h2>
+            <p className="cn-text">
+              منیر برای بهتر شدن تجربه‌ات، بعضی اطلاعات رو ذخیره می‌کنه
+            </p>
+            {consentExpanded && (
+              <div className="cn-details">
+                <p>اطلاعاتی که ذخیره می‌شه:</p>
+                <ul>
+                  <li>احساسات و موضوعات مکالمه</li>
+                  <li>موقعیت تقریبی (کشور / شهر)</li>
+                  <li>الگوهای رشد معنوی</li>
+                </ul>
+                <p className="cn-note">هیچ اطلاعات شخصی‌ای به کسی داده نمی‌شه</p>
+              </div>
+            )}
+            <div className="cn-btns">
+              <button className="cn-btn-accept" onClick={handleConsent}>قبول می‌کنم</button>
+              <button className="cn-btn-more" onClick={() => setConsentExpanded(p => !p)}>
+                {consentExpanded ? "بستن" : "بیشتر بدون"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── ONBOARDING OVERLAY ── */}
       {showOnboarding && (
@@ -597,6 +645,73 @@ export default function App() {
           .tnav { padding: 12px 16px; }
           .htxt { padding-top: 4px; }
         }
+
+        /* ── CONSENT ── */
+        .cn-overlay {
+          position: fixed; inset: 0; z-index: 110;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(2,6,18,0.88);
+          backdrop-filter: blur(14px);
+          animation: obFade .35s ease both;
+        }
+        .cn-card {
+          width: min(340px, 90vw);
+          background: rgba(5,9,24,0.97);
+          border: 1px solid rgba(212,160,23,0.28);
+          border-radius: 24px;
+          padding: 36px 26px 30px;
+          display: flex; flex-direction: column; align-items: center; gap: 16px;
+          box-shadow: 0 12px 70px rgba(0,0,0,0.82), 0 0 80px rgba(212,160,23,0.05);
+          animation: obSlide .45s cubic-bezier(.22,.68,0,1.2) both;
+        }
+        .cn-logo {
+          width: 52px; height: 52px; border-radius: 50%;
+          background: radial-gradient(circle at 36% 36%, #fff5d0, #d4a017 42%, #7a5200 88%);
+          display: flex; align-items: center; justify-content: center; font-size: 20px;
+          box-shadow: 0 0 20px rgba(212,160,23,0.62), 0 0 44px rgba(212,160,23,0.26);
+          animation: lp 3.2s ease-in-out infinite;
+        }
+        .cn-title {
+          font-size: 30px; font-weight: 700; color: #d4a017;
+          text-shadow: 0 0 28px rgba(212,160,23,0.50); margin: 0;
+        }
+        .cn-text {
+          font-size: 14px; color: rgba(232,223,200,0.82);
+          text-align: center; line-height: 1.80; direction: rtl;
+        }
+        .cn-details {
+          width: 100%;
+          background: rgba(212,160,23,0.05);
+          border: 1px solid rgba(212,160,23,0.15);
+          border-radius: 12px; padding: 14px 16px;
+          animation: obFade .25s ease both;
+        }
+        .cn-details p { font-size: 12.5px; color: rgba(212,160,23,0.70); margin-bottom: 8px; direction: rtl; text-align: right; }
+        .cn-details ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+        .cn-details li { font-size: 12px; color: rgba(232,223,200,0.60); direction: rtl; text-align: right; padding-right: 12px; position: relative; }
+        .cn-details li::before { content: "•"; color: rgba(212,160,23,0.50); position: absolute; right: 0; }
+        .cn-note { font-size: 11px !important; color: rgba(212,160,23,0.38) !important; margin-top: 10px !important; margin-bottom: 0 !important; }
+        .cn-btns { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+        .cn-btn-accept {
+          width: 100%; padding: 14px;
+          background: #d4a017; color: #06080f;
+          border: none; border-radius: 14px;
+          font-size: 15px; font-weight: 700;
+          font-family: 'Vazirmatn', sans-serif; cursor: pointer;
+          box-shadow: 0 0 22px rgba(212,160,23,0.50);
+          transition: background .2s, transform .1s;
+        }
+        .cn-btn-accept:hover  { background: #e8b520; }
+        .cn-btn-accept:active { transform: scale(.97); }
+        .cn-btn-more {
+          width: 100%; padding: 10px;
+          background: transparent; color: rgba(212,160,23,0.50);
+          border: 1px solid rgba(212,160,23,0.18);
+          border-radius: 12px; font-size: 13px;
+          font-family: 'Vazirmatn', sans-serif; cursor: pointer;
+          transition: color .2s, border-color .2s;
+        }
+        .cn-btn-more:hover { color: rgba(212,160,23,0.80); border-color: rgba(212,160,23,0.38); }
 
         /* ── ONBOARDING ── */
         .ob-overlay {

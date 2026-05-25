@@ -610,6 +610,8 @@ export async function POST(request: NextRequest) {
     const sessionStartTime: string = body.sessionStartTime || new Date().toISOString();
     const sessionMessageCount: number = body.sessionMessageCount || 1;
     const userName: string | undefined = typeof body.userName === 'string' ? body.userName.trim() || undefined : undefined;
+    const consentGiven: boolean | undefined = body.consentGiven === true ? true : undefined;
+    const consentDate: string | undefined = typeof body.consentDate === 'string' ? body.consentDate : undefined;
     const deviceType = detectDeviceType(request.headers.get('user-agent') || '');
     const languageDetected = detectLanguage(message);
     
@@ -1005,7 +1007,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── user_identity: هویت دموگرافیک (fire-and-forget) ─────────────────────
-    if (newIdentityData || (!currentIdentity.user_id)) {
+    if (newIdentityData || (!currentIdentity.user_id) || (consentGiven && !currentIdentity.consent_given)) {
       const { changed: _c, ...identityFields } = newIdentityData ?? { changed: false };
       const identityMerged: Record<string, any> = {
         ...currentIdentity,
@@ -1018,8 +1020,10 @@ export async function POST(request: NextRequest) {
         gender:     currentProfile.gender    ?? currentIdentity.gender ?? null,
         // timezone از request header
         timezone:   currentIdentity.timezone ?? timezone ?? null,
-        country:    ipCountry ?? currentIdentity.country ?? (identityFields as any).country ?? null,
-        city:       ipCity    ?? currentIdentity.city    ?? null,
+        country:       ipCountry ?? currentIdentity.country ?? (identityFields as any).country ?? null,
+        city:          ipCity    ?? currentIdentity.city    ?? null,
+        consent_given: consentGiven ?? currentIdentity.consent_given ?? undefined,
+        consent_date:  consentGiven ? (consentDate ?? currentIdentity.consent_date ?? null) : (currentIdentity.consent_date ?? undefined),
       };
       supabase.from('user_identity')
         .upsert(identityMerged, { onConflict: 'user_id' })
