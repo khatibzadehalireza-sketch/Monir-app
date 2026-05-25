@@ -187,15 +187,15 @@ const PROFILE_EXTRACT_PROMPT = `تحلیل‌گر حافظه هستی. پیام 
 const METADATA_EXTRACT_PROMPT = `تحلیل‌گر رفتاری هستی. از تبادل زیر، فیلدهای ساختاریافته رو به JSON برگردون.
 
 فیلدها:
-- topic: موضوع اصلی — یکی از: خانواده | ازدواج | تنهایی | اضطراب | افسردگی | ایمان | هویت | کار | تحصیل | سوگ | خشم | روابط | سلامت | خودارزیابی | سایر
-- subtopic: موضوع جزئی‌تر، حداکثر ۳ کلمه فارسی
+- main_topic: موضوع اصلی — یکی از: خانواده | ازدواج | تنهایی | اضطراب | افسردگی | ایمان | هویت | کار | تحصیل | سوگ | خشم | روابط | سلامت | خودارزیابی | سایر
+- sub_topic: موضوع جزئی‌تر، حداکثر ۳ کلمه فارسی
 - emotional_state: یکی از: آرام | ناراحت | مضطرب | افسرده | عصبانی | امیدوار | گیج | آسیب‌پذیر | بحران
 - anxiety_score: عدد صحیح ۰ تا ۱۰ (شدت اضطراب)
 - loneliness_score: عدد صحیح ۰ تا ۱۰ (شدت تنهایی)
 - guilt_score: عدد صحیح ۰ تا ۱۰ (شدت احساس گناه)
 - hope_score: عدد صحیح ۰ تا ۱۰ (میزان امید)
 - urgency: low | medium | high | critical
-- conversation_depth: عدد صحیح ۱ تا ۵ (۱=سطحی، ۵=بحران عمیق/بیان درد شدید)
+- session_depth: عدد صحیح ۱ تا ۵ (۱=سطحی، ۵=بحران عمیق/بیان درد شدید)
 
 فقط JSON خالص بدون توضیح اضافه.`;
 
@@ -288,15 +288,15 @@ interface ProfileData {
 }
 
 interface MetadataData {
-  topic?: string;
-  subtopic?: string;
+  main_topic?: string;
+  sub_topic?: string;
   emotional_state?: string;
   anxiety_score?: number;
   loneliness_score?: number;
   guilt_score?: number;
   hope_score?: number;
   urgency?: string;
-  conversation_depth?: number;
+  session_depth?: number;
 }
 
 interface IdentityData {
@@ -802,15 +802,15 @@ export async function POST(request: NextRequest) {
       supabase.from('conversation_metadata').insert({
         user_id:            userId,
         session_id:         sessionId,
-        topic:              newMetadata.topic              ?? null,
-        subtopic:           newMetadata.subtopic           ?? null,
+        main_topic:         newMetadata.main_topic         ?? null,
+        sub_topic:          newMetadata.sub_topic          ?? null,
         emotional_state:    newMetadata.emotional_state    ?? null,
-        anxiety_score:      clamp(newMetadata.anxiety_score,     0, 10),
-        loneliness_score:   clamp(newMetadata.loneliness_score,  0, 10),
-        guilt_score:        clamp(newMetadata.guilt_score,       0, 10),
-        hope_score:         clamp(newMetadata.hope_score,        0, 10),
+        anxiety_score:      clamp(newMetadata.anxiety_score,    0, 10),
+        loneliness_score:   clamp(newMetadata.loneliness_score, 0, 10),
+        guilt_score:        clamp(newMetadata.guilt_score,      0, 10),
+        hope_score:         clamp(newMetadata.hope_score,       0, 10),
         urgency:            newMetadata.urgency            ?? null,
-        conversation_depth: clamp(newMetadata.conversation_depth, 1, 5),
+        session_depth:      clamp(newMetadata.session_depth,    1,  5),
       }).then(({ error }) => { if (error) console.error('[meta insert]', error.message); });
     }
 
