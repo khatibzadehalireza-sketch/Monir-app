@@ -426,6 +426,8 @@ export async function POST(request: NextRequest) {
     const today     = new Date().toISOString().split('T')[0];
     const sessionId = `${userId}_${sessionStartTime.replace(/\D/g, '').slice(2, 16)}`;
     const timezone  = request.headers.get('cf-timezone') ?? request.headers.get('x-timezone') ?? null;
+    const ipCountry = request.headers.get('x-vercel-ip-country') ?? null;
+    const ipCity    = request.headers.get('x-vercel-ip-city')    ?? null;
 
     // --- لیمیت + پروفایل + تاریخچه + هویت در parallel ---
     const [countResult, profileResult, historyResult, identityResult] = await Promise.all([
@@ -615,6 +617,8 @@ export async function POST(request: NextRequest) {
         gender:     currentProfile.gender    ?? currentIdentity.gender ?? null,
         // timezone از request header
         timezone:   currentIdentity.timezone ?? timezone ?? null,
+        country:    ipCountry ?? currentIdentity.country ?? (identityFields as any).country ?? null,
+        city:       ipCity    ?? currentIdentity.city    ?? null,
       };
       supabase.from('user_identity')
         .upsert(identityMerged, { onConflict: 'user_id' })
