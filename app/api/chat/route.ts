@@ -269,6 +269,36 @@ interface UnsaidData {
   softened_words?: Array<{ said: string; likely_meant: string }>;
 }
 
+// تشخیص ریسک بحران — نشانه‌های ظریف که کلیدواژه‌های صریح نیستن
+const SAFETY_RISK_DETECT_PROMPT = `تحلیل‌گر ریسک هستی. پیام کاربر رو برای نشانه‌های بحران بررسی کن — حتی وقتی صریح نگفته.
+
+دسته‌بندی trigger_type:
+- self_harm: «کاش نبودم»، «خسته از زندگی»، «به درد نمی‌خورم»، آرزوی مرگ غیرمستقیم، احساس بار بودن برای دیگران
+- panic: وحشت شدید، «دارم دیوونه می‌شم»، احساس خفگی، از دست دادن کنترل
+- isolation: «هیچکس نمی‌فهمه‌م»، «به کسی نمی‌تونم بگم»، قطع کامل از خانواده/دوستان
+- grief: داغ تازه فلج‌کننده، «از وقتی رفت آدم نیستم»، از دست دادن معنا
+
+سطح ریسک:
+- critical: قصد صریح یا شبه‌صریح آسیب یا مرگ
+- high: نشانه‌های قوی بدون بیان مستقیم (مثل «کاش نبودم»، «دیگه نمی‌تونم»)
+- medium: نگرانی مشخص، نیاز به حمایت فعال
+- low: غم/اضطراب معمول، بدون نشانه بحران
+
+اگه پیام عادی‌ست یا هیچ نشانه‌ای نیست: {"detected": false}
+
+در غیر این صورت:
+{"detected": true, "risk_level": "low|medium|high|critical", "trigger_type": "self_harm|panic|isolation|grief", "confidence": 0.0-1.0, "reasoning": "یک جمله"}
+
+فقط JSON خالص.`;
+
+interface SafetyRiskData {
+  detected: boolean;
+  risk_level?: 'low' | 'medium' | 'high' | 'critical';
+  trigger_type?: 'self_harm' | 'panic' | 'isolation' | 'grief';
+  confidence?: number;
+  reasoning?: string;
+}
+
 interface SessionSummaryData {
   main_topic?: string;
   sub_topic?: string;
@@ -771,7 +801,7 @@ export async function POST(request: NextRequest) {
       { role: 'assistant' as const, content: reply   },
     ];
 
-    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled, lifeEventSettled, unsaidSettled] = await Promise.allSettled([
+    const [profileSettled, metadataSettled, identitySettled, sessionSettled, emotionSettled, lifeEventSettled, unsaidSettled, safetyRiskSettled] = await Promise.allSettled([
 
       // ── پروفایل: حافظه بلندمدت کاربر ──────────────────────────────────────
       (async (): Promise<ProfileData | null> => {
@@ -895,6 +925,23 @@ export async function POST(request: NextRequest) {
         const parsed = JSON.parse(raw) as UnsaidData;
         return parsed.detected ? parsed : null;
       })(),
+
+      // ── ریسک بحران: نشانه‌های ظریف در پیام کاربر ─────────────────────────
+      (async (): Promise<SafetyRiskData | null> => {
+        const res = await groq.chat.completions.create({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: SAFETY_RISK_DETECT_PROMPT },
+            { role: 'user',   content: message },
+          ],
+          max_tokens: 150,
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+        const raw    = res.choices[0]?.message?.content || '{"detected":false}';
+        const parsed = JSON.parse(raw) as SafetyRiskData;
+        return parsed.detected ? parsed : null;
+      })(),
     ]);
 
     const newProfileData    = profileSettled.status    === 'fulfilled' ? profileSettled.value    : null;
@@ -913,6 +960,14 @@ export async function POST(request: NextRequest) {
     if (lifeEventSettled.status  === 'rejected') console.error('[life_event]', (lifeEventSettled  as any).reason?.message);
     if (unsaidSettled.status     === 'rejected') console.error('[unsaid]',     (unsaidSettled     as any).reason?.message);
     else console.log('[profile] extracted:', JSON.stringify(newProfileData));
+
+    const newSafetyRisk = safetyRiskSettled.status === 'fulfilled' ? safetyRiskSettled.value : null;
+    if (safetyRiskSettled.status === 'rejected') console.error('[safety_risk]', (safetyRiskSettled as any).reason?.message);
+
+    // اگه ریسک high یا critical: منابع بحران رو به جواب اضافه کن
+    if (newSafetyRisk?.detected && (newSafetyRisk.risk_level === 'high' || newSafetyRisk.risk_level === 'critical')) {
+      reply += '\n\n—\n🌙 اگه این روزا سنگینه، کمک گرفتن شجاعانه‌ست:\n🇳🇱 هلند: 0800-0113 (رایگان، ۲۴ ساعته)';
+    }
 
     const now = new Date().toISOString();
 
@@ -1127,6 +1182,21 @@ export async function POST(request: NextRequest) {
             .then(({ error }) => { if (error) console.error('[emotion embedding]', error.message); });
         })
         .catch(err => console.error('[emotion embedding]', err?.message));
+    }
+
+    // ── safety_risk_events: ثبت رویداد ریسک (fire-and-forget) ──────────────
+    if (newSafetyRisk?.detected && newSafetyRisk.risk_level) {
+      const actionTaken = (newSafetyRisk.risk_level === 'high' || newSafetyRisk.risk_level === 'critical')
+        ? 'crisis_resources_appended'
+        : 'monitored';
+      supabase.from('safety_risk_events').insert({
+        user_id:      userId,
+        session_id:   sessionId,
+        risk_level:   newSafetyRisk.risk_level,
+        trigger_type: newSafetyRisk.trigger_type ?? null,
+        detected_at:  now,
+        action_taken: actionTaken,
+      }).then(({ error }) => { if (error) console.error('[safety_risk insert]', error.message); });
     }
 
     return NextResponse.json({ reply });
