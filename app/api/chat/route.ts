@@ -1060,6 +1060,16 @@ export async function POST(request: NextRequest) {
         consent_given: consentGiven ?? currentIdentity.consent_given ?? undefined,
         consent_date:  consentGiven ? (consentDate ?? currentIdentity.consent_date ?? null) : (currentIdentity.consent_date ?? undefined),
         last_seen:     now,
+        // Return rate tracking — only increment on the first message of each session
+        total_sessions: sessionMessageCount === 1
+          ? (currentIdentity.total_sessions ?? 0) + 1
+          : (currentIdentity.total_sessions ?? 0),
+        day7_return: (currentIdentity.day7_return === true ||
+          (sessionMessageCount === 1 && daysSinceSeen !== null && daysSinceSeen >= 6 && daysSinceSeen <= 8))
+          ? true : (currentIdentity.day7_return ?? null),
+        day30_return: (currentIdentity.day30_return === true ||
+          (sessionMessageCount === 1 && daysSinceSeen !== null && daysSinceSeen >= 25 && daysSinceSeen <= 35))
+          ? true : (currentIdentity.day30_return ?? null),
       };
       supabase.from('user_identity')
         .upsert(identityMerged, { onConflict: 'user_id' })

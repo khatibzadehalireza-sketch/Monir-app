@@ -20,6 +20,8 @@ export default function App() {
   const [onboardingName, setOnboardingName] = useState("");
   const [onboardingAge, setOnboardingAge] = useState("");
   const [userName, setUserName] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const router = useRouter();
 
@@ -27,6 +29,7 @@ export default function App() {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const sessionStart = useRef(new Date().toISOString());
   const msgCount = useRef(0);
+  const feedbackShownRef = useRef(false);
 
   useEffect(() => {
     if (!localStorage.getItem("monir_consent_given")) {
@@ -78,6 +81,20 @@ export default function App() {
     e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
   }, []);
 
+  const submitFeedback = useCallback(async (score: number) => {
+    setShowFeedback(false);
+    setFeedbackSubmitted(true);
+    const uid = localStorage.getItem("munir_uid") || "";
+    const sid = `${uid}_${sessionStart.current.replace(/\D/g, '').slice(2, 16)}`;
+    try {
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sid, user_id: uid, helpfulness_score: score }),
+      });
+    } catch { /* silent */ }
+  }, []);
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || isLoading) return;
@@ -108,6 +125,10 @@ export default function App() {
       });
       const data = await res.json();
       setMessages(p => [...p, { role: "assistant", content: data.reply, id: Date.now().toString() }]);
+      if (msgCount.current >= 5 && !feedbackShownRef.current) {
+        feedbackShownRef.current = true;
+        setShowFeedback(true);
+      }
     } catch {
       setMessages(p => [...p, { role: "assistant", content: "فرزندم... ارتباط قطع شد.", id: Date.now().toString() }]);
     } finally { setIsLoading(false); }
@@ -242,6 +263,21 @@ export default function App() {
                     <span className="d" style={{animationDelay:".4s"}}/>
                   </div>
                 </div>
+              )}
+              {showFeedback && !feedbackSubmitted && (
+                <div className="fb-row">
+                  <div className="fb-card">
+                    <p className="fb-q">این مکالمه چقدر کمک کرد؟</p>
+                    <div className="fb-emojis">
+                      {(["😞","😕","😐","🙂","😊"] as const).map((em, i) => (
+                        <button key={i} className="fb-em" onClick={() => submitFeedback(i + 1)}>{em}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {feedbackSubmitted && (
+                <div className="fb-done">ممنون از نظرت 🌙</div>
               )}
               <div ref={endRef} />
             </div>
@@ -798,6 +834,41 @@ export default function App() {
         }
         .ob-btn:hover  { background: #e8b520; }
         .ob-btn:active { transform: scale(.97); }
+
+        /* ── FEEDBACK RATING ── */
+        .fb-row {
+          display: flex; justify-content: center;
+          padding: 4px 0 8px;
+          animation: pop .35s cubic-bezier(.22,.68,0,1.2) both;
+        }
+        .fb-card {
+          background: rgba(7,14,36,.90);
+          border: 1px solid rgba(212,160,23,.28);
+          border-radius: 18px;
+          padding: 14px 20px;
+          display: flex; flex-direction: column; align-items: center; gap: 12px;
+          backdrop-filter: blur(16px);
+          box-shadow: 0 4px 28px rgba(0,0,0,.45);
+          max-width: 320px; width: 100%;
+        }
+        .fb-q {
+          font-size: 13.5px; color: rgba(232,223,200,.85);
+          text-align: center; direction: rtl; font-weight: 400; margin: 0;
+        }
+        .fb-emojis { display: flex; gap: 10px; }
+        .fb-em {
+          font-size: 26px; background: none; border: none; cursor: pointer;
+          padding: 4px 6px; border-radius: 10px;
+          transition: transform .15s, background .15s;
+        }
+        .fb-em:hover  { transform: scale(1.28); background: rgba(212,160,23,.10); }
+        .fb-em:active { transform: scale(.92); }
+        .fb-done {
+          text-align: center; font-size: 13px;
+          color: rgba(212,160,23,.60); padding: 8px 0 4px;
+          direction: rtl;
+          animation: pop .28s both;
+        }
       `}</style>
     </>
   );
