@@ -699,7 +699,7 @@ export async function POST(request: NextRequest) {
 
     // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی + before scores در parallel ---
     const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
-    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult] = await Promise.all([
+    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('conversations').select('role, content').eq('user_id', userId)
@@ -714,6 +714,7 @@ export async function POST(request: NextRequest) {
             .eq('session_id', sessionId)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
+      supabase.from('behavioral_patterns').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
     if (countResult.error)       console.error('[supabase] message_counts:', countResult.error.message);
@@ -721,6 +722,7 @@ export async function POST(request: NextRequest) {
     if (historyResult.error)     console.error('[supabase] conversations:', historyResult.error.message);
     if (identityResult.error)    console.error('[supabase] user_identity:', identityResult.error.message);
     if ((sessionBeforeResult as any)?.error) console.error('[supabase] before_scores:', (sessionBeforeResult as any).error.message);
+    if ((bpResult as any)?.error) console.error('[supabase] behavioral_patterns:', (bpResult as any).error.message);
 
     const beforeRow = (sessionBeforeResult as any)?.data as
       { before_hope: number | null; before_anxiety: number | null } | null;
@@ -740,6 +742,7 @@ export async function POST(request: NextRequest) {
 
     const currentProfile: Record<string, any> = profileRow ?? {};
     const currentIdentity: Record<string, any> = identityResult.data ?? {};
+    const currentBP: Record<string, any> | null = (bpResult as any).data ?? null;
     const history = rawHistory ? [...rawHistory].reverse() : [];
 
     // اوقات شرعی: اگه ipCity نداشتیم، از شهر ذخیره‌شده در هویت استفاده کن
@@ -1182,6 +1185,40 @@ export async function POST(request: NextRequest) {
             .then(({ error }) => { if (error) console.error('[emotion embedding]', error.message); });
         })
         .catch(err => console.error('[emotion embedding]', err?.message));
+    }
+
+    // ── behavioral_patterns: اثر انگشت رفتاری (fire-and-forget) ────────────
+    {
+      const currentHour = new Date().getUTCHours();
+      const msgLen      = message.length;
+
+      // EMA α=0.8: 80% history, 20% new observation — history is never overwritten
+      const newAvgLen = currentBP?.avg_message_length != null
+        ? Math.round((currentBP.avg_message_length * 0.8 + msgLen * 0.2) * 10) / 10
+        : msgLen;
+
+      // days_between_sessions — only update on the first message of a new session
+      let newDBS: number | null = currentBP?.days_between_sessions ?? null;
+      if (sessionMessageCount === 1 && daysSinceSeen !== null) {
+        newDBS = newDBS !== null
+          ? Math.round((newDBS * 0.8 + daysSinceSeen * 0.2) * 10) / 10
+          : daysSinceSeen;
+      }
+
+      const newSessionCount = sessionMessageCount === 1
+        ? (currentBP?.total_sessions_count ?? 0) + 1
+        : (currentBP?.total_sessions_count ?? 0);
+
+      supabase.from('behavioral_patterns').upsert({
+        user_id:               userId,
+        avg_message_length:    newAvgLen,
+        active_hour:           currentHour,
+        days_between_sessions: newDBS,
+        crisis_recovery_days:  currentBP?.crisis_recovery_days ?? null,
+        total_sessions_count:  newSessionCount,
+        last_updated:          now,
+      }, { onConflict: 'user_id' })
+        .then(({ error }) => { if (error) console.error('[behavioral_patterns upsert]', error.message); });
     }
 
     // ── safety_risk_events: ثبت رویداد ریسک (fire-and-forget) ──────────────
