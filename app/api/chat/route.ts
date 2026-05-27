@@ -656,7 +656,7 @@ async function generateEmotionEmbedding(
     content: { role: 'user', parts: [{ text: parts.join(' | ') }] },
     taskType: TaskType.SEMANTIC_SIMILARITY,
     outputDimensionality: 384,
-  });
+  } as import('@google/generative-ai').EmbedContentRequest & { outputDimensionality: number });
   return result.embedding.values;
 }
 
