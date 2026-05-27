@@ -18,15 +18,25 @@ export default function ProfilePage() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    const uid = localStorage.getItem("munir_uid");
-    if (!uid) { setLoading(false); return; }
-    setUserId(uid);
+    const supabase = getSupabaseBrowser();
 
-    fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+    // Use the real Supabase auth session — not the raw localStorage key,
+    // because the chat page auto-generates a munir_uid for every visitor,
+    // so checking localStorage alone would never show the guest state.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const uid = session?.user?.id ?? null;
+      if (!uid) { setLoading(false); return; }
+
+      setUserId(uid);
+      // Keep localStorage in sync so the chat API uses the same ID
+      localStorage.setItem("munir_uid", uid);
+
+      fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
+        .then(r => r.json())
+        .then(setData)
+        .catch(() => setData(null))
+        .finally(() => setLoading(false));
+    });
   }, []);
 
   const handleLogout = useCallback(async () => {
