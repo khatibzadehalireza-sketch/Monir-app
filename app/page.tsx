@@ -3,166 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
-
-/* ─── Types ───────────────────────────────────────── */
-interface Post {
-  id: string; user_id: string; author_name: string;
-  content: string; created_at: string;
-  ameen_count: number; comment_count: number; i_said_ameen: boolean;
-}
-interface Comment {
-  id: string; user_id: string; author_name: string;
-  content: string; created_at: string;
-}
-interface Message { role: "user" | "assistant"; content: string; id: string; }
-
-/* ─── Stories ─────────────────────────────────────── */
-const STORIES = [
-  { id: "ai", name: "منیر", isAI: true },
-];
-
-/* ─── Helpers ─────────────────────────────────────── */
-function timeAgo(iso: string): string {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)    return "همین الان";
-  if (diff < 3600)  return `${Math.floor(diff / 60)} دقیقه پیش`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} ساعت پیش`;
-  return `${Math.floor(diff / 86400)} روز پیش`;
-}
-
-/* ─── Comment Section ─────────────────────────────── */
-function CommentSection({
-  postId, userId, initialCount, onCountChange,
-}: { postId: string; userId: string | null; initialCount: number; onCountChange: (d: number) => void; }) {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loaded,   setLoaded]   = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [text,     setText]     = useState("");
-  const [sending,  setSending]  = useState(false);
-  const [error,    setError]    = useState("");
-
-  const load = useCallback(async () => {
-    if (loaded) return;
-    setLoading(true);
-    try {
-      const res  = await fetch(`/api/posts/${postId}/comments`);
-      const data = await res.json();
-      setComments(data.comments ?? []);
-      setLoaded(true);
-    } finally { setLoading(false); }
-  }, [postId, loaded]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const submit = useCallback(async () => {
-    if (!text.trim() || sending || !userId) return;
-    setSending(true); setError("");
-    try {
-      const res  = await fetch(`/api/posts/${postId}/comments`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, content: text.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "خطا"); return; }
-      setComments(p => [...p, data.comment]);
-      onCountChange(1); setText("");
-    } finally { setSending(false); }
-  }, [text, sending, userId, postId, onCountChange]);
-
-  return (
-    <div className="cmt-wrap">
-      {loading && <p className="cmt-hint">در حال بارگذاری...</p>}
-      {loaded && comments.length === 0 && <p className="cmt-hint">اولین نظر رو بنویس 🌙</p>}
-      {comments.map(c => (
-        <div key={c.id} className="cmt-row">
-          <div className="cmt-av">{c.author_name.charAt(0) || "م"}</div>
-          <div className="cmt-body">
-            <div className="cmt-name-row">
-              <span className="cmt-name">{c.author_name}</span>
-              <span className="cmt-time">{timeAgo(c.created_at)}</span>
-            </div>
-            <p className="cmt-txt">{c.content}</p>
-          </div>
-        </div>
-      ))}
-      {userId ? (
-        <div className="cmt-input-row">
-          <textarea
-            className="cmt-ta"
-            placeholder="نظرت رو بنویس..."
-            value={text} maxLength={300} rows={1}
-            onChange={e => { setText(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; }}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
-          />
-          <button className={`cmt-send${text.trim() && !sending ? " cmt-send-on" : ""}`} onClick={submit} disabled={!text.trim() || sending}>
-            {sending ? "..." : "ارسال"}
-          </button>
-        </div>
-      ) : (
-        <p className="cmt-hint-login">برای نظر دادن وارد شو 🔐</p>
-      )}
-      {error && <p className="cmt-err">{error}</p>}
-    </div>
-  );
-}
-
-/* ─── Post Card ───────────────────────────────────── */
-function PostCard({ post: initial, userId }: { post: Post; userId: string | null; }) {
-  const [post,         setPost]         = useState(initial);
-  const [ameenAnim,    setAmeenAnim]    = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [commentCount, setCommentCount] = useState(initial.comment_count);
-
-  const handleAmeen = useCallback(async () => {
-    if (!userId) return;
-    const was = post.i_said_ameen;
-    setPost(p => ({ ...p, i_said_ameen: !was, ameen_count: was ? Math.max(0, p.ameen_count - 1) : p.ameen_count + 1 }));
-    if (!was) { setAmeenAnim(true); setTimeout(() => setAmeenAnim(false), 600); }
-    try {
-      const res  = await fetch(`/api/posts/${post.id}/ameen`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      if (res.ok) setPost(p => ({ ...p, ameen_count: data.ameen_count, i_said_ameen: data.i_said_ameen }));
-      else        setPost(p => ({ ...p, i_said_ameen: was, ameen_count: was ? p.ameen_count + 1 : Math.max(0, p.ameen_count - 1) }));
-    } catch { setPost(p => ({ ...p, i_said_ameen: was })); }
-  }, [userId, post]);
-
-  return (
-    <article className="post-card">
-      <div className="post-hdr">
-        <div className="post-av">{post.author_name.charAt(0) || "م"}</div>
-        <div className="post-meta">
-          <span className="post-name">{post.author_name}</span>
-          <span className="post-time">{timeAgo(post.created_at)}</span>
-        </div>
-        <div className="post-hdr-dot" />
-      </div>
-      <p className="post-content">{post.content}</p>
-      <div className="post-actions">
-        <button
-          className={`ameen-btn${post.i_said_ameen ? " ameen-on" : ""}${ameenAnim ? " ameen-pop" : ""}${!userId ? " ameen-disabled" : ""}`}
-          onClick={handleAmeen}
-          title={userId ? undefined : "برای آمین گفتن وارد شو"}
-        >
-          <span className="ameen-icon">🤲</span>
-          <span className="ameen-label">آمین</span>
-          {post.ameen_count > 0 && <span className="ameen-count">{post.ameen_count}</span>}
-        </button>
-        <button className={`cmt-btn${showComments ? " cmt-btn-on" : ""}`} onClick={() => setShowComments(p => !p)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          <span>{commentCount > 0 ? commentCount : "نظر"}</span>
-        </button>
-      </div>
-      {showComments && (
-        <CommentSection postId={post.id} userId={userId} initialCount={commentCount} onCountChange={d => setCommentCount(c => c + d)} />
-      )}
-    </article>
-  );
-}
+import { Header }      from "@/components/Header";
+import { StoriesBar }  from "@/components/StoriesBar";
+import { PostFeed }    from "@/components/PostFeed";
+import { BottomNav }   from "@/components/BottomNav";
+import { ChatScreen }  from "@/components/ChatScreen";
+import type { Post }   from "@/lib/types";
 
 /* ─── New Post Modal ──────────────────────────────── */
 function NewPostModal({
@@ -213,20 +59,9 @@ function NewPostModal({
   );
 }
 
-/* ─── Constants ───────────────────────────────────── */
-const OPENING = "اینجام و دوست دارم بشنوم 🌙";
-
 /* ─── Main App ────────────────────────────────────── */
 export default function App() {
   const [screen, setScreen] = useState<"home" | "chat">("home");
-
-  /* chat */
-  const [messages,          setMessages]          = useState<Message[]>([]);
-  const [input,             setInput]             = useState("");
-  const [isLoading,         setIsLoading]         = useState(false);
-  const [focused,           setFocused]           = useState(false);
-  const [showFeedback,      setShowFeedback]      = useState(false);
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   /* auth */
   const [userId,     setUserId]     = useState<string | null>(null);
@@ -241,19 +76,14 @@ export default function App() {
   const [showNew,     setShowNew]     = useState(false);
 
   /* consent / onboarding */
-  const [showConsent,      setShowConsent]      = useState(false);
-  const [consentExpanded,  setConsentExpanded]  = useState(false);
-  const [showOnboarding,   setShowOnboarding]   = useState(false);
-  const [onboardingName,   setOnboardingName]   = useState("");
-  const [onboardingAge,    setOnboardingAge]    = useState("");
+  const [showConsent,     setShowConsent]     = useState(false);
+  const [consentExpanded, setConsentExpanded] = useState(false);
+  const [showOnboarding,  setShowOnboarding]  = useState(false);
+  const [onboardingName,  setOnboardingName]  = useState("");
+  const [onboardingAge,   setOnboardingAge]   = useState("");
 
-  const router       = useRouter();
-  const endRef       = useRef<HTMLDivElement>(null);
-  const taRef        = useRef<HTMLTextAreaElement>(null);
-  const sessionStart = useRef(new Date().toISOString());
-  const msgCount     = useRef(0);
-  const feedbackShownRef = useRef(false);
-  const feedInitRef  = useRef(false);
+  const router      = useRouter();
+  const feedInitRef = useRef(false);
 
   /* ── Consent / onboarding check ─────────────────── */
   useEffect(() => {
@@ -297,15 +127,6 @@ export default function App() {
     });
   }, []);
 
-  /* ── Chat opening message ────────────────────────── */
-  useEffect(() => {
-    if (screen === "chat" && messages.length === 0)
-      setTimeout(() => setMessages([{ role: "assistant", content: OPENING, id: "0" }]), 600);
-  }, [screen]);
-
-  /* ── Scroll to bottom in chat ────────────────────── */
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
-
   /* ── Load feed ───────────────────────────────────── */
   const loadFeed = useCallback(async (cursor?: string) => {
     if (!cursor) setLoadingFeed(true); else setLoadingMore(true);
@@ -348,66 +169,6 @@ export default function App() {
     setShowOnboarding(false);
   }, [onboardingName, onboardingAge]);
 
-  /* ── Chat handlers ───────────────────────────────── */
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
-  }, []);
-
-  const submitFeedback = useCallback(async (score: number) => {
-    setShowFeedback(false); setFeedbackSubmitted(true);
-    const uid = localStorage.getItem("munir_uid") || "";
-    const sid = `${uid}_${sessionStart.current.replace(/\D/g, "").slice(2, 16)}`;
-    try {
-      await fetch("/api/feedback", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sid, user_id: uid, helpfulness_score: score }),
-      });
-    } catch { /* silent */ }
-  }, []);
-
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || isLoading) return;
-    const userMsg: Message = { role: "user", content: text, id: Date.now().toString() };
-    setMessages(p => [...p, userMsg]);
-    setInput("");
-    if (taRef.current) taRef.current.style.height = "auto";
-    setIsLoading(true);
-    msgCount.current++;
-    try {
-      const res  = await fetch("/api/chat", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-          userId: (() => {
-            let id = localStorage.getItem("munir_uid");
-            if (!id) { id = "u_" + Math.random().toString(36).slice(2); localStorage.setItem("munir_uid", id); }
-            return id;
-          })(),
-          sessionStartTime:    sessionStart.current,
-          sessionMessageCount: msgCount.current,
-          userName:    userName || undefined,
-          consentGiven: localStorage.getItem("monir_consent_given") === "true" ? true : undefined,
-          consentDate:  localStorage.getItem("monir_consent_date") || undefined,
-        }),
-      });
-      const data = await res.json();
-      setMessages(p => [...p, { role: "assistant", content: data.reply, id: Date.now().toString() }]);
-      if (msgCount.current >= 5 && !feedbackShownRef.current) {
-        feedbackShownRef.current = true; setShowFeedback(true);
-      }
-    } catch {
-      setMessages(p => [...p, { role: "assistant", content: "فرزندم... ارتباط قطع شد.", id: Date.now().toString() }]);
-    } finally { setIsLoading(false); }
-  }, [input, isLoading, messages, userName]);
-
-  const onKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-  }, [send]);
-
   /* ── Render ──────────────────────────────────────── */
   return (
     <>
@@ -418,176 +179,26 @@ export default function App() {
         {/* ══ HOME SCREEN ══ */}
         {screen === "home" && (
           <div className="screen home">
-
-            {/* Header */}
-            <header className="ig-hdr">
-              <span className="ig-logo">منیر</span>
-              <button className="ibtn nbtn" aria-label="اعلان‌ها">
-                <svg width="19" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                <span className="ndot" />
-              </button>
-            </header>
-
-            {/* Stories bar */}
-            <div className="stories-bar">
-              {STORIES.map(s => (
-                <button
-                  key={s.id}
-                  className="story"
-                  onClick={() => s.isAI && setScreen("chat")}
-                >
-                  <div className={`story-ring${s.isAI ? " story-ring-ai" : ""}`}>
-                    <div className={`story-av${s.isAI ? " story-av-ai" : ""}`}>
-                      <span>{s.isAI ? "✦" : s.name.charAt(0)}</span>
-                    </div>
-                  </div>
-                  <span className="story-name">{s.name}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Feed */}
-            <div className="feed-scroll">
-              {loadingFeed && (
-                <div className="center-msg">
-                  <div className="spinner" />
-                  <p className="hint">در حال بارگذاری...</p>
-                </div>
-              )}
-              {!loadingFeed && posts.length === 0 && (
-                <div className="center-msg">
-                  <div className="empty-icon">🌙</div>
-                  <p className="hint">هنوز پستی نیست. اولین نفر باش!</p>
-                  {userId && (
-                    <button className="btn-gold" onClick={() => setShowNew(true)}>اولین پست رو بنویس ✦</button>
-                  )}
-                </div>
-              )}
-              {posts.map(p => <PostCard key={p.id} post={p} userId={userId} />)}
-              {nextCursor && !loadingMore && (
-                <button className="load-more" onClick={() => loadFeed(nextCursor)}>پست‌های بیشتر</button>
-              )}
-              {loadingMore && (
-                <div className="load-more-spin"><div className="spinner-sm" /></div>
-              )}
-              <div style={{ height: 16 }} />
-            </div>
-
-            {/* Bottom tab bar */}
-            <nav className="ig-bnav">
-              <button className="ni ni-on">
-                <span className="ni-pip" />
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                </svg>
-                <span>خانه</span>
-              </button>
-
-              <button className="ni">
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <span>جستجو</span>
-              </button>
-
-              <button className="ni ni-post" onClick={() => userId ? setShowNew(true) : router.push("/login")}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"/>
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </button>
-
-              <button className="ni" onClick={() => router.push("/prayer")}>
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <span>نماز</span>
-              </button>
-
-              <button className="ni" onClick={() => router.push("/profile")}>
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-                <span>پروفایل</span>
-              </button>
-            </nav>
+            <Header />
+            <StoriesBar onOpenChat={() => setScreen("chat")} />
+            <PostFeed
+              posts={posts}
+              userId={userId}
+              loadingFeed={loadingFeed}
+              loadingMore={loadingMore}
+              nextCursor={nextCursor}
+              onLoadMore={() => loadFeed(nextCursor ?? undefined)}
+              onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
+            />
+            <BottomNav
+              onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
+            />
           </div>
         )}
 
         {/* ══ CHAT SCREEN ══ */}
         {screen === "chat" && (
-          <div className="screen chat">
-            <header className="chdr">
-              <button className="ibtn" onClick={() => setScreen("home")}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15,18 9,12 15,6"/>
-                </svg>
-              </button>
-              <div className="chdr-mid">
-                <div className="logo"><span>✦</span></div>
-                <div>
-                  <div className="hname">منیر</div>
-                  <div className="htag">همراه معنوی</div>
-                </div>
-              </div>
-              <div className="hverse">أَفَلَا تَتَفَکَّرُونَ</div>
-            </header>
-
-            <div className="msgs">
-              {messages.map(m => (
-                <div key={m.id} className={`row row-${m.role}`}>
-                  {m.role === "assistant" && <div className="av"><span>✦</span></div>}
-                  <div className={`bubble bubble-${m.role}`}>{m.content}</div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="row row-assistant">
-                  <div className="av"><span>✦</span></div>
-                  <div className="bubble bubble-assistant bubble-dots">
-                    <span className="d" style={{ animationDelay: "0s" }} />
-                    <span className="d" style={{ animationDelay: ".2s" }} />
-                    <span className="d" style={{ animationDelay: ".4s" }} />
-                  </div>
-                </div>
-              )}
-              {showFeedback && !feedbackSubmitted && (
-                <div className="fb-row">
-                  <div className="fb-card">
-                    <p className="fb-q">این مکالمه چقدر کمک کرد؟</p>
-                    <div className="fb-emojis">
-                      {(["😞", "😕", "😐", "🙂", "😊"] as const).map((em, i) => (
-                        <button key={i} className="fb-em" onClick={() => submitFeedback(i + 1)}>{em}</button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {feedbackSubmitted && <div className="fb-done">ممنون از نظرت 🌙</div>}
-              <div ref={endRef} />
-            </div>
-
-            <div className="bar">
-              <div className={`ibox${focused ? " ibox-on" : ""}`}>
-                <textarea
-                  ref={taRef} value={input} onChange={handleChange} onKeyDown={onKey}
-                  onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-                  placeholder="هر چه در دل داری بگو..." rows={1} className="ta"
-                />
-                <button onClick={send} disabled={!input.trim() || isLoading}
-                  className={`sbtn${input.trim() && !isLoading ? " sbtn-on" : ""}`}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"/>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+          <ChatScreen onBack={() => setScreen("home")} userName={userName} />
         )}
       </div>
 
@@ -752,7 +363,6 @@ export default function App() {
         }
         .story:active { transform: scale(0.94); }
 
-        /* Ring wrapper — spinning gradient for AI */
         .story-ring {
           border-radius: 50%;
           padding: 2.5px;
@@ -1077,7 +687,6 @@ export default function App() {
         }
         .ni-on svg { filter: drop-shadow(0 0 4px rgba(212,160,23,0.50)); }
 
-        /* Active pip indicator */
         .ni-pip {
           position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
           width: 18px; height: 2px; border-radius: 2px;
@@ -1085,7 +694,6 @@ export default function App() {
           box-shadow: 0 0 8px rgba(212,160,23,0.70);
         }
 
-        /* Post (+) button */
         .ni-post {
           width: 46px; height: 46px;
           background: linear-gradient(135deg, rgba(212,160,23,0.18), rgba(212,160,23,0.10));
