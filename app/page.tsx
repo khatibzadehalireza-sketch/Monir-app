@@ -18,13 +18,7 @@ interface Message { role: "user" | "assistant"; content: string; id: string; }
 
 /* ─── Stories (static avatars) ────────────────────── */
 const STORIES = [
-  { id: "ai", name: "منیر",   isAI: true },
-  { id: "s1", name: "احمد",   isAI: false },
-  { id: "s2", name: "فاطمه",  isAI: false },
-  { id: "s3", name: "علی",    isAI: false },
-  { id: "s4", name: "مریم",   isAI: false },
-  { id: "s5", name: "حسین",   isAI: false },
-  { id: "s6", name: "زینب",   isAI: false },
+  { id: "ai", name: "منیر", isAI: true },
 ];
 
 /* ─── Helpers ─────────────────────────────────────── */
