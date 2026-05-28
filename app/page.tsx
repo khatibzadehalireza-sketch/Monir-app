@@ -738,11 +738,11 @@ export default function App() {
           padding: 2px;
         }
         .story-av {
-          width: 60px; height: 60px; border-radius: 50%;
-          border: 2px solid rgba(212,160,23,0.35);
+          width: 80px; height: 80px; border-radius: 50%;
+          border: 2.5px solid rgba(212,160,23,0.35);
           background: rgba(8,12,30,0.90);
           display: flex; align-items: center; justify-content: center;
-          font-size: 22px; font-weight: 700; color: #e8d5a0;
+          font-size: 30px; font-weight: 700; color: #e8d5a0;
           transition: border-color .2s, box-shadow .2s;
         }
         .story-av-ai {
@@ -1291,7 +1291,7 @@ export default function App() {
 
         @media (max-width: 480px) {
           .ig-logo { font-size: 23px; }
-          .story-av { width: 54px; height: 54px; }
+          .story-av { width: 70px; height: 70px; }
         }
       `}</style>
     </>
