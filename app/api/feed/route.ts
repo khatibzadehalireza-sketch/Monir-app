@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from('posts')
-      .select('id, user_id, content, created_at, ameen_count')
+      .select('id, user_id, content, created_at, ameen_count, image_url')
       .order('created_at', { ascending: false })
       .limit(limit + 1);   // fetch one extra to know if there is a next page
 
@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
       ameen_count:   p.ameen_count,
       comment_count: commentCountMap[p.id] ?? 0,
       i_said_ameen:  ameenSet.has(p.id),
+      image_url:     p.image_url ?? null,
     }));
 
     const nextCursor = hasMore

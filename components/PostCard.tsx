@@ -119,6 +119,11 @@ export function PostCard({ post: initial, userId }: { post: Post; userId: string
         <div className="post-hdr-dot" />
       </div>
       <p className="post-content">{post.content}</p>
+      {post.image_url && (
+        <div className="post-img-wrap">
+          <img src={post.image_url} alt="" className="post-img" loading="lazy" />
+        </div>
+      )}
       <div className="post-actions">
         <button
           className={`ameen-btn${post.i_said_ameen ? " ameen-on" : ""}${ameenAnim ? " ameen-pop" : ""}${!userId ? " ameen-disabled" : ""}`}

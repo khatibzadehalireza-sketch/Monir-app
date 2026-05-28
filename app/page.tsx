@@ -11,31 +11,74 @@ import { ChatScreen }  from "@/components/ChatScreen";
 import type { Post }   from "@/lib/types";
 
 /* ─── New Post Modal ──────────────────────────────── */
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
 function NewPostModal({
   userId, authorName, onClose, onCreated,
 }: { userId: string; authorName: string; onClose: () => void; onCreated: (p: Post) => void; }) {
-  const [text,    setText]    = useState("");
-  const [sending, setSending] = useState(false);
-  const [error,   setError]   = useState("");
+  const [text,         setText]         = useState("");
+  const [sending,      setSending]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [imageFile,    setImageFile]    = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const MAX = 500;
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError("فقط فایل‌های jpg، png و webp مجاز هستند");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError("حجم عکس نباید بیشتر از ۵ مگابایت باشد");
+      return;
+    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setError("");
+  };
+
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   const submit = useCallback(async () => {
     if (!text.trim() || sending) return;
     setSending(true); setError("");
     try {
+      let imageUrl: string | undefined;
+      if (imageFile) {
+        const supabase = getSupabaseBrowser();
+        const ext  = imageFile.name.split(".").pop()?.toLowerCase() ?? "jpg";
+        const path = `${userId}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("post-images")
+          .upload(path, imageFile, { contentType: imageFile.type });
+        if (uploadErr) { setError("خطا در آپلود عکس. دوباره امتحان کن."); return; }
+        imageUrl = supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl;
+      }
+
       const res  = await fetch("/api/posts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, content: text.trim() }),
+        body: JSON.stringify({ userId, content: text.trim(), imageUrl }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(res.status === 422 ? "محتوای پست مناسب نیست. لطفاً ویرایش کن." : (data.error ?? "خطا در ارسال"));
         return;
       }
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
       onCreated({ ...data.post, author_name: authorName, comment_count: 0, i_said_ameen: false });
       onClose();
     } finally { setSending(false); }
-  }, [text, sending, userId, authorName, onCreated, onClose]);
+  }, [text, sending, imageFile, imagePreview, userId, authorName, onCreated, onClose]);
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -44,14 +87,42 @@ function NewPostModal({
           <span className="modal-title">پست جدید ✦</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
+
+        {imagePreview && (
+          <div className="modal-img-preview">
+            <img src={imagePreview} alt="پیش‌نمایش" />
+            <button className="modal-img-remove" onClick={removeImage} type="button">✕</button>
+          </div>
+        )}
+
         <textarea className="modal-ta" placeholder="افکار معنوی‌ات رو به اشتراک بذار..."
           value={text} maxLength={MAX} autoFocus onChange={e => setText(e.target.value)} />
+
         <div className="modal-footer">
-          <span className={`char-count${text.length > MAX * 0.9 ? " char-warn" : ""}`}>{text.length}/{MAX}</span>
+          <div className="modal-footer-left">
+            <input
+              ref={fileRef} type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="modal-file-input"
+              onChange={handleImageSelect}
+            />
+            <button
+              className={`modal-photo-btn${imageFile ? " modal-photo-btn-on" : ""}`}
+              onClick={() => fileRef.current?.click()}
+              type="button" title="افزودن عکس"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+            <span className={`char-count${text.length > MAX * 0.9 ? " char-warn" : ""}`}>{text.length}/{MAX}</span>
+          </div>
           {error && <span className="modal-err">{error}</span>}
           <button className={`modal-submit${text.trim() && !sending ? " modal-submit-on" : ""}`}
             onClick={submit} disabled={!text.trim() || sending}>
-            {sending ? "در حال ارسال..." : "انتشار"}
+            {sending ? (imageFile ? "در حال آپلود..." : "در حال ارسال...") : "انتشار"}
           </button>
         </div>
       </div>
@@ -561,6 +632,19 @@ export default function App() {
           color: rgba(212,160,23,0.90);
         }
 
+        /* Post image */
+        .post-img-wrap {
+          overflow: hidden;
+          max-height: 380px;
+          background: rgba(0,0,0,0.18);
+        }
+        .post-img {
+          width: 100%; max-height: 380px;
+          object-fit: cover; display: block;
+          transition: transform .35s ease;
+        }
+        .post-card:hover .post-img { transform: scale(1.02); }
+
         .cmt-btn {
           display: flex; align-items: center; gap: 6px;
           padding: 8px 14px; border-radius: 22px;
@@ -935,10 +1019,43 @@ export default function App() {
         }
         .modal-ta::placeholder { color: rgba(212,160,23,0.22); }
 
-        .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        /* Image preview inside modal */
+        .modal-img-preview {
+          position: relative; border-radius: 14px; overflow: hidden;
+          max-height: 220px; background: rgba(0,0,0,0.25);
+          border: 1px solid rgba(212,160,23,0.18);
+        }
+        .modal-img-preview img {
+          width: 100%; max-height: 220px; object-fit: cover; display: block;
+        }
+        .modal-img-remove {
+          position: absolute; top: 8px; right: 8px;
+          width: 28px; height: 28px; border-radius: 50%;
+          background: rgba(0,0,0,0.70); border: none; color: #fff;
+          font-size: 11px; display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: background .18s;
+        }
+        .modal-img-remove:hover { background: rgba(0,0,0,0.90); }
+
+        .modal-file-input { display: none; }
+        .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .modal-footer-left { display: flex; align-items: center; gap: 10px; }
+        .modal-photo-btn {
+          width: 34px; height: 34px; border-radius: 10px;
+          background: rgba(212,160,23,0.07);
+          border: 1px solid rgba(212,160,23,0.20);
+          color: rgba(212,160,23,0.58);
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; transition: all .20s; flex-shrink: 0;
+        }
+        .modal-photo-btn:hover, .modal-photo-btn.modal-photo-btn-on {
+          background: rgba(212,160,23,0.16);
+          border-color: rgba(212,160,23,0.42);
+          color: #d4a017;
+        }
         .char-count { font-size: 11.5px; color: rgba(212,160,23,0.32); }
         .char-warn  { color: rgba(255,140,40,0.70); }
-        .modal-err  { font-size: 12.5px; color: rgba(255,100,100,0.72); flex: 1; text-align: center; }
+        .modal-err  { font-size: 12px; color: rgba(255,100,100,0.72); flex: 1; text-align: center; min-width: 0; }
 
         .modal-submit {
           padding: 11px 24px; border: none; border-radius: 14px;

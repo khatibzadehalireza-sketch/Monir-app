@@ -55,7 +55,7 @@ Allow:
  */
 export async function POST(req: NextRequest) {
   try {
-    const { userId, content } = await req.json();
+    const { userId, content, imageUrl } = await req.json();
 
     if (!userId) {
       return NextResponse.json({ error: 'userId required' }, { status: 401 });
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('posts')
-      .insert({ user_id: userId, content: trimmed })
-      .select('id, user_id, content, created_at, ameen_count')
+      .insert({ user_id: userId, content: trimmed, image_url: imageUrl ?? null })
+      .select('id, user_id, content, created_at, ameen_count, image_url')
       .single();
 
     if (error) throw error;

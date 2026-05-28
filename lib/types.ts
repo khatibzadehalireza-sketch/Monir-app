@@ -7,6 +7,7 @@ export interface Post {
   ameen_count: number;
   comment_count: number;
   i_said_ameen: boolean;
+  image_url?: string | null;
 }
 
 export interface Comment {
