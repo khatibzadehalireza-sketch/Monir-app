@@ -1248,64 +1248,62 @@ export default function App() {
         ════════════════════════════════════════════ */
         .live-section {
           flex-shrink: 0;
-          padding: 10px 0 8px;
+          padding: 12px 0 10px;
           background: rgba(2,7,22,0.60);
           border-bottom: 1px solid rgba(212,160,23,0.07);
         }
         .live-row {
-          display: flex; gap: 10px;
+          display: flex; gap: 18px;
           padding: 0 18px;
           overflow-x: auto; scrollbar-width: none;
           -webkit-overflow-scrolling: touch;
         }
         .live-row::-webkit-scrollbar { display: none; }
 
-        .live-card {
-          flex-shrink: 0; position: relative;
-          width: 210px; height: 120px;
-          border-radius: 12px; overflow: hidden;
-          border: 1px solid rgba(212,160,23,0.18);
-          box-shadow: 0 4px 18px rgba(0,0,0,0.55);
-          text-decoration: none; display: block;
-          transition: transform .22s, box-shadow .22s;
+        .live-story {
+          display: flex; flex-direction: column; align-items: center; gap: 5px;
+          text-decoration: none; flex-shrink: 0;
+          transition: transform .2s;
         }
-        .live-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 28px rgba(0,0,0,0.65), 0 0 0 1px rgba(212,160,23,0.30);
+        .live-story:active { transform: scale(0.94); }
+
+        .live-ring {
+          border-radius: 50%;
+          padding: 2.5px;
+          background: linear-gradient(135deg, #f5d060 0%, #d4a017 50%, #8b6008 100%);
+          box-shadow:
+            0 0 12px rgba(212,160,23,0.55),
+            0 0 28px rgba(212,160,23,0.22);
+          animation: live-ring-pulse 2.2s ease-in-out infinite;
         }
-        .live-thumb-img {
-          width: 100%; height: 100%; object-fit: cover; display: block;
-          transition: transform .35s ease;
+        @keyframes live-ring-pulse {
+          0%,100% { box-shadow: 0 0 10px rgba(212,160,23,0.50), 0 0 22px rgba(212,160,23,0.18); }
+          50%      { box-shadow: 0 0 18px rgba(212,160,23,0.80), 0 0 38px rgba(212,160,23,0.34); }
         }
-        .live-card:hover .live-thumb-img { transform: scale(1.05); }
-        .live-overlay {
-          position: absolute; inset: 0;
-          background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.72) 100%);
+
+        .live-circle {
+          width: 66px; height: 66px; border-radius: 50%;
+          background: radial-gradient(circle at 35% 32%, #fff8d6, #d4a017 44%, #7a5200 90%);
+          border: 2.5px solid #020a1a;
           display: flex; flex-direction: column;
-          justify-content: space-between;
-          padding: 8px 10px;
+          align-items: center; justify-content: center; gap: 1px;
         }
-        .live-badge {
-          align-self: flex-start;
-          background: #e53e3e; color: #fff;
+        .live-circle-line {
+          display: block;
+          font-size: 10px; font-weight: 800;
+          color: #06080f; line-height: 1.25;
+          direction: rtl; text-align: center;
+        }
+
+        .live-label {
           font-size: 9.5px; font-weight: 700;
-          padding: 2px 7px; border-radius: 5px;
-          box-shadow: 0 0 8px rgba(229,62,62,0.60);
-          letter-spacing: 0.03em;
+          color: #e53e3e;
+          letter-spacing: 0.02em;
           animation: live-blink 1.4s ease-in-out infinite;
         }
         @keyframes live-blink {
           0%,100% { opacity: 1; }
-          50%      { opacity: 0.55; }
-        }
-        .live-overlay-info { direction: rtl; }
-        .live-card-name {
-          font-size: 13px; font-weight: 700; color: #fff;
-          text-shadow: 0 1px 6px rgba(0,0,0,0.70);
-          margin-bottom: 2px;
-        }
-        .live-card-loc {
-          font-size: 10.5px; color: rgba(245,208,96,0.82); font-weight: 300;
+          50%      { opacity: 0.40; }
         }
 
         /* ── Quran recitation toggle ── */
