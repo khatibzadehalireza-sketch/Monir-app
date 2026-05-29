@@ -252,8 +252,8 @@ export default function App() {
         {screen === "home" && (
           <div className="screen home">
             <Header />
-            <StoriesBar onOpenChat={() => setScreen("chat")} />
             <LiveStreams />
+            <StoriesBar onOpenChat={() => setScreen("chat")} />
             <PostFeed
               posts={posts}
               userId={userId}
@@ -1248,87 +1248,64 @@ export default function App() {
         ════════════════════════════════════════════ */
         .live-section {
           flex-shrink: 0;
-          padding: 14px 0 10px;
-          background: rgba(2,7,22,0.55);
-          border-bottom: 1px solid rgba(212,160,23,0.06);
-        }
-        .live-title {
-          display: flex; align-items: center; gap: 8px;
-          padding: 0 18px 11px;
-          font-size: 12.5px; font-weight: 600;
-          color: rgba(212,160,23,0.65);
-          direction: rtl;
-        }
-        .live-dot {
-          width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-          background: #e53e3e;
-          box-shadow: 0 0 8px rgba(229,62,62,0.80);
-          animation: live-blink 1.4s ease-in-out infinite;
-        }
-        @keyframes live-blink {
-          0%,100% { opacity: 1; }
-          50%      { opacity: 0.30; }
+          padding: 10px 0 8px;
+          background: rgba(2,7,22,0.60);
+          border-bottom: 1px solid rgba(212,160,23,0.07);
         }
         .live-row {
-          display: flex; gap: 12px;
-          padding: 0 18px 4px;
+          display: flex; gap: 10px;
+          padding: 0 18px;
           overflow-x: auto; scrollbar-width: none;
           -webkit-overflow-scrolling: touch;
         }
         .live-row::-webkit-scrollbar { display: none; }
 
         .live-card {
-          flex-shrink: 0; width: 232px;
-          border-radius: 16px; overflow: hidden;
-          background: rgba(7,11,27,0.90);
-          border: 1px solid rgba(212,160,23,0.16);
-          box-shadow: 0 4px 20px rgba(0,0,0,0.50);
-          transition: box-shadow .25s, transform .25s;
+          flex-shrink: 0; position: relative;
+          width: 210px; height: 120px;
+          border-radius: 12px; overflow: hidden;
+          border: 1px solid rgba(212,160,23,0.18);
+          box-shadow: 0 4px 18px rgba(0,0,0,0.55);
+          text-decoration: none; display: block;
+          transition: transform .22s, box-shadow .22s;
         }
         .live-card:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.60), 0 0 0 1px rgba(212,160,23,0.26);
-        }
-
-        .live-thumb {
-          position: relative; width: 100%; aspect-ratio: 16/9;
-          border: none; padding: 0; cursor: pointer; display: block;
-          background: rgba(0,0,0,0.50); overflow: hidden;
+          box-shadow: 0 8px 28px rgba(0,0,0,0.65), 0 0 0 1px rgba(212,160,23,0.30);
         }
         .live-thumb-img {
           width: 100%; height: 100%; object-fit: cover; display: block;
           transition: transform .35s ease;
         }
-        .live-thumb:hover .live-thumb-img { transform: scale(1.04); }
-        .live-play {
+        .live-card:hover .live-thumb-img { transform: scale(1.05); }
+        .live-overlay {
           position: absolute; inset: 0;
-          display: flex; align-items: center; justify-content: center;
-          background: rgba(0,0,0,0.28); color: #fff;
-          transition: background .22s;
+          background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.72) 100%);
+          display: flex; flex-direction: column;
+          justify-content: space-between;
+          padding: 8px 10px;
         }
-        .live-thumb:hover .live-play { background: rgba(0,0,0,0.44); }
-        .live-play svg { filter: drop-shadow(0 0 8px rgba(255,255,255,0.55)); }
         .live-badge {
-          position: absolute; top: 8px; left: 8px;
+          align-self: flex-start;
           background: #e53e3e; color: #fff;
-          font-size: 10px; font-weight: 700;
-          padding: 2px 8px; border-radius: 6px;
-          box-shadow: 0 0 10px rgba(229,62,62,0.55);
+          font-size: 9.5px; font-weight: 700;
+          padding: 2px 7px; border-radius: 5px;
+          box-shadow: 0 0 8px rgba(229,62,62,0.60);
           letter-spacing: 0.03em;
+          animation: live-blink 1.4s ease-in-out infinite;
         }
-        .live-iframe {
-          width: 100%; aspect-ratio: 16/9;
-          border: none; display: block;
+        @keyframes live-blink {
+          0%,100% { opacity: 1; }
+          50%      { opacity: 0.55; }
         }
-        .live-card-info {
-          padding: 10px 13px 12px; direction: rtl;
-        }
+        .live-overlay-info { direction: rtl; }
         .live-card-name {
-          font-size: 13px; font-weight: 700;
-          color: rgba(232,215,160,0.88); margin-bottom: 3px;
+          font-size: 13px; font-weight: 700; color: #fff;
+          text-shadow: 0 1px 6px rgba(0,0,0,0.70);
+          margin-bottom: 2px;
         }
         .live-card-loc {
-          font-size: 11px; color: rgba(212,160,23,0.46); font-weight: 300;
+          font-size: 10.5px; color: rgba(245,208,96,0.82); font-weight: 300;
         }
 
         /* ── Quran recitation toggle ── */
