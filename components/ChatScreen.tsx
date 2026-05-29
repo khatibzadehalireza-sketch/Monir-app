@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
 const QURAN_STREAM = "https://cdn.islamic.network/quran/audio-surah/128/ar.alafasy/55.mp3";
@@ -294,9 +295,9 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
               {m.role === "assistant" && <div className="av"><span>✦</span></div>}
               <div className={`bubble bubble-${m.role}`}>{m.content}</div>
             </div>
-            {m.widget === 'prayer' && <PrayerWidget />}
-            {m.widget === 'qibla'  && <QiblaWidget />}
-            {m.widget === 'post'   && <PostWidget onOpen={onOpenPost} />}
+            {m.widget === 'prayer' && <ErrorBoundary silent><PrayerWidget /></ErrorBoundary>}
+            {m.widget === 'qibla'  && <ErrorBoundary silent><QiblaWidget /></ErrorBoundary>}
+            {m.widget === 'post'   && <ErrorBoundary silent><PostWidget onOpen={onOpenPost} /></ErrorBoundary>}
           </Fragment>
         ))}
         {isLoading && (

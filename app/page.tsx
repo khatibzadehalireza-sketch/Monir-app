@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
-import { Header }      from "@/components/Header";
-import { StoriesBar }  from "@/components/StoriesBar";
-import { PostFeed }    from "@/components/PostFeed";
-import { BottomNav }   from "@/components/BottomNav";
-import { ChatScreen }  from "@/components/ChatScreen";
-import { LiveStreams } from "@/components/LiveStreams";
+import { Header }        from "@/components/Header";
+import { StoriesBar }    from "@/components/StoriesBar";
+import { PostFeed }      from "@/components/PostFeed";
+import { BottomNav }     from "@/components/BottomNav";
+import { ChatScreen }    from "@/components/ChatScreen";
+import { LiveStreams }   from "@/components/LiveStreams";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { Post }   from "@/lib/types";
 
 /* ─── New Post Modal ──────────────────────────────── */
@@ -251,41 +252,71 @@ export default function App() {
         {/* ══ HOME SCREEN ══ */}
         {screen === "home" && (
           <div className="screen home">
-            <Header />
-            <LiveStreams />
-            <StoriesBar onOpenChat={() => setScreen("chat")} />
-            <PostFeed
-              posts={posts}
-              userId={userId}
-              loadingFeed={loadingFeed}
-              loadingMore={loadingMore}
-              nextCursor={nextCursor}
-              onLoadMore={() => loadFeed(nextCursor ?? undefined)}
-              onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
-            />
-            <BottomNav
-              onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
-            />
+            <ErrorBoundary silent>
+              <Header />
+            </ErrorBoundary>
+            <ErrorBoundary silent>
+              <LiveStreams />
+            </ErrorBoundary>
+            <ErrorBoundary silent>
+              <StoriesBar onOpenChat={() => setScreen("chat")} />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", color: "rgba(212,160,23,0.50)", fontSize: "13px", fontFamily: "Vazirmatn, sans-serif", direction: "rtl" }}>
+                <span style={{ fontSize: "26px" }}>⚠</span>
+                <span>خطا در بارگذاری پست‌ها</span>
+              </div>
+            }>
+              <PostFeed
+                posts={posts}
+                userId={userId}
+                loadingFeed={loadingFeed}
+                loadingMore={loadingMore}
+                nextCursor={nextCursor}
+                onLoadMore={() => loadFeed(nextCursor ?? undefined)}
+                onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary silent>
+              <BottomNav
+                onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
+              />
+            </ErrorBoundary>
           </div>
         )}
 
         {/* ══ CHAT SCREEN ══ */}
         {screen === "chat" && (
-          <ChatScreen
-            onBack={() => setScreen("home")}
-            userName={userName}
-            onOpenPost={() => userId ? setShowNew(true) : router.push("/login")}
-          />
+          <ErrorBoundary fallback={
+            <div className="screen" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "18px", padding: "32px 24px", fontFamily: "Vazirmatn, sans-serif", direction: "rtl", textAlign: "center" }}>
+              <div style={{ fontSize: "38px", opacity: 0.7 }}>✦</div>
+              <p style={{ color: "rgba(212,160,23,0.65)", fontSize: "14px", lineHeight: 1.8 }}>منیر الان در دسترس نیست<br/>لطفاً دوباره تلاش کنید</p>
+              <button
+                onClick={() => setScreen("home")}
+                style={{ padding: "11px 28px", borderRadius: "22px", border: "1px solid rgba(212,160,23,0.32)", background: "rgba(212,160,23,0.10)", color: "rgba(212,160,23,0.80)", fontFamily: "Vazirmatn, sans-serif", fontSize: "13px", cursor: "pointer" }}
+              >
+                بازگشت به خانه
+              </button>
+            </div>
+          }>
+            <ChatScreen
+              onBack={() => setScreen("home")}
+              userName={userName}
+              onOpenPost={() => userId ? setShowNew(true) : router.push("/login")}
+            />
+          </ErrorBoundary>
         )}
       </div>
 
       {/* ── New post modal ── */}
       {showNew && userId && (
-        <NewPostModal
-          userId={userId} authorName={authorName}
-          onClose={() => setShowNew(false)}
-          onCreated={post => setPosts(p => [post, ...p])}
-        />
+        <ErrorBoundary silent>
+          <NewPostModal
+            userId={userId} authorName={authorName}
+            onClose={() => setShowNew(false)}
+            onCreated={post => setPosts(p => [post, ...p])}
+          />
+        </ErrorBoundary>
       )}
 
       {/* ── Consent overlay ── */}
