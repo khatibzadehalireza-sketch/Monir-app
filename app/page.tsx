@@ -1306,6 +1306,75 @@ export default function App() {
           50%      { opacity: 0.40; }
         }
 
+        /* ── Chat intent widgets ── */
+        .wgt-card {
+          background: rgba(6,12,34,0.92);
+          border: 1px solid rgba(212,160,23,0.22);
+          border-radius: 16px; padding: 13px 15px;
+          max-width: min(76%, 440px);
+          margin-left: 41px;
+          backdrop-filter: blur(18px);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.44);
+          animation: pop .30s cubic-bezier(.22,.68,0,1.2) both;
+          display: flex; flex-direction: column; gap: 9px;
+          direction: rtl;
+        }
+        .wgt-title {
+          font-size: 12.5px; font-weight: 700;
+          color: rgba(245,208,96,0.88);
+        }
+        .wgt-row {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 4px 0;
+          border-bottom: 1px solid rgba(212,160,23,0.07);
+        }
+        .wgt-row:last-child { border-bottom: none; }
+        .wgt-label   { font-size: 12px;   color: rgba(232,215,160,0.60); }
+        .wgt-value   { font-size: 12.5px; font-weight: 600; color: rgba(245,208,96,0.88); }
+        .wgt-sublabel{ font-size: 10.5px; color: rgba(212,160,23,0.48); margin-top: 2px; }
+        .wgt-loading { font-size: 11.5px; color: rgba(212,160,23,0.46); }
+        .wgt-err     { font-size: 11.5px; color: rgba(232,215,160,0.46); line-height: 1.55; }
+        .wgt-btn {
+          align-self: flex-start;
+          padding: 9px 15px; border-radius: 11px;
+          background: rgba(212,160,23,0.10);
+          border: 1px solid rgba(212,160,23,0.34);
+          color: #d4a017;
+          font-family: 'Vazirmatn', sans-serif; font-size: 12.5px; font-weight: 600;
+          cursor: pointer; transition: all .22s;
+        }
+        .wgt-btn:hover {
+          background: rgba(212,160,23,0.20);
+          box-shadow: 0 0 14px rgba(212,160,23,0.28);
+        }
+        .wgt-qibla-row { display: flex; align-items: center; gap: 14px; }
+        .wgt-compass-ring {
+          width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+          border: 1.5px solid rgba(212,160,23,0.28);
+          background: rgba(212,160,23,0.04);
+          position: relative;
+        }
+        .wgt-compass-needle {
+          position: absolute; inset: 0;
+          transform-origin: center;
+          transition: transform 0.8s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .wgt-needle-up {
+          position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+          width: 0; height: 0;
+          border-left: 4px solid transparent;
+          border-right: 4px solid transparent;
+          border-bottom: 20px solid #d4a017;
+          filter: drop-shadow(0 0 4px rgba(212,160,23,0.55));
+        }
+        .wgt-needle-dot {
+          position: absolute; top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 7px; height: 7px; border-radius: 50%;
+          background: #d4a017;
+          box-shadow: 0 0 8px rgba(212,160,23,0.70);
+        }
+
         /* ── Quran recitation toggle ── */
         .qrn-btn { flex-shrink: 0; }
         .qrn-on {

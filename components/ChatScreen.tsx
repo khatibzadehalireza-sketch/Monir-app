@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 
@@ -25,6 +25,104 @@ const INTENT_REPLIES: Record<ChatIntent, string> = {
   qibla:   'آوردم قبله‌نما رو برات 🧭',
   profile: 'داری می‌بری به پروفایل 👤',
 };
+
+/* ── Intent widget helpers ─────────────────────── */
+
+function calcQibla(lat: number, lon: number): number {
+  const KAABA_LAT = 21.4225, KAABA_LON = 39.8262;
+  const dL = (KAABA_LON - lon) * Math.PI / 180;
+  const φ1 = lat * Math.PI / 180, φ2 = KAABA_LAT * Math.PI / 180;
+  const x = Math.sin(dL) * Math.cos(φ2);
+  const y = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dL);
+  return ((Math.atan2(x, y) * 180 / Math.PI) + 360) % 360;
+}
+
+function PrayerWidget() {
+  const [times, setTimes] = useState<Record<string, string> | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = (lat: number, lon: number) =>
+      fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=3`)
+        .then(r => r.json())
+        .then(d => { setTimes(d?.data?.timings ?? null); setLoading(false); })
+        .catch(() => setLoading(false));
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        p => load(p.coords.latitude, p.coords.longitude),
+        ()  => load(52.3676, 4.9041),
+      );
+    } else {
+      load(52.3676, 4.9041);
+    }
+  }, []);
+
+  const PRAYERS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
+  const NAMES: Record<string, string> = { Fajr: 'صبح', Dhuhr: 'ظهر', Asr: 'عصر', Maghrib: 'مغرب', Isha: 'عشا' };
+
+  if (loading) return <div className="wgt-card"><div className="wgt-loading">در حال بارگذاری اوقات شرعی...</div></div>;
+  if (!times)  return null;
+  return (
+    <div className="wgt-card">
+      <div className="wgt-title">🕌 اوقات شرعی امروز</div>
+      {PRAYERS.map(p => (
+        <div key={p} className="wgt-row">
+          <span className="wgt-label">{NAMES[p]}</span>
+          <span className="wgt-value">{times[p]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function QiblaWidget() {
+  const [deg, setDeg] = useState<number | null>(null);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    if (!navigator.geolocation) { setErr(true); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => setDeg(Math.round(calcQibla(p.coords.latitude, p.coords.longitude))),
+      () => setErr(true),
+    );
+  }, []);
+
+  return (
+    <div className="wgt-card">
+      <div className="wgt-title">🧭 جهت قبله</div>
+      {deg !== null ? (
+        <div className="wgt-qibla-row">
+          <div className="wgt-compass-ring">
+            <div className="wgt-compass-needle" style={{ transform: `rotate(${deg}deg)` }}>
+              <div className="wgt-needle-up" />
+              <div className="wgt-needle-dot" />
+            </div>
+          </div>
+          <div>
+            <div className="wgt-value">{deg}°</div>
+            <div className="wgt-sublabel">از شمال 🕋</div>
+          </div>
+        </div>
+      ) : err ? (
+        <div className="wgt-err">دسترسی به موقعیت لازمه — صفحه اوقات شرعی قبله‌نمای کامل داره</div>
+      ) : (
+        <div className="wgt-loading">در حال محاسبه جهت قبله...</div>
+      )}
+    </div>
+  );
+}
+
+function PostWidget({ onOpen }: { onOpen?: () => void }) {
+  return (
+    <div className="wgt-card">
+      <div className="wgt-title">✦ ایجاد محتوای جدید</div>
+      <button className="wgt-btn" onClick={onOpen}>باز کردن ویرایشگر</button>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────── */
 
 interface Props {
   onBack: () => void;
@@ -109,10 +207,19 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
 
     const intent = detectChatIntent(text);
     if (intent) {
-      setTimeout(() => setMessages(p => [...p, { role: "assistant", content: INTENT_REPLIES[intent], id: Date.now().toString() }]), 400);
+      const widgetType: Message["widget"] =
+        intent === 'prayer' ? 'prayer' :
+        intent === 'qibla'  ? 'qibla'  :
+        (intent === 'story' || intent === 'post') ? 'post' : undefined;
+
+      setTimeout(() => setMessages(p => [...p, {
+        role: "assistant" as const,
+        content: INTENT_REPLIES[intent],
+        id: Date.now().toString(),
+        widget: widgetType,
+      }]), 400);
       setTimeout(() => {
         if (intent === 'story' || intent === 'post') onOpenPost?.();
-        else if (intent === 'prayer' || intent === 'qibla') router.push('/prayer');
         else if (intent === 'profile') router.push('/profile');
       }, 900);
       return;
@@ -182,10 +289,15 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
 
       <div className="msgs">
         {messages.map(m => (
-          <div key={m.id} className={`row row-${m.role}`}>
-            {m.role === "assistant" && <div className="av"><span>✦</span></div>}
-            <div className={`bubble bubble-${m.role}`}>{m.content}</div>
-          </div>
+          <Fragment key={m.id}>
+            <div className={`row row-${m.role}`}>
+              {m.role === "assistant" && <div className="av"><span>✦</span></div>}
+              <div className={`bubble bubble-${m.role}`}>{m.content}</div>
+            </div>
+            {m.widget === 'prayer' && <PrayerWidget />}
+            {m.widget === 'qibla'  && <QiblaWidget />}
+            {m.widget === 'post'   && <PostWidget onOpen={onOpenPost} />}
+          </Fragment>
         ))}
         {isLoading && (
           <div className="row row-assistant">
