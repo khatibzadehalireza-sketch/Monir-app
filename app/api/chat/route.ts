@@ -454,6 +454,39 @@ function detectLanguage(text: string): string {
   return total > 0 && persianChars / total > 0.3 ? 'fa' : 'en';
 }
 
+function detectUserLanguage(message: string, storedLang?: string): 'fa' | 'ar' | 'tr' | 'ur' | 'en' {
+  if (storedLang && ['fa', 'ar', 'tr', 'ur', 'en'].includes(storedLang)) {
+    return storedLang as 'fa' | 'ar' | 'tr' | 'ur' | 'en';
+  }
+  // Turkish: Latin script with Turkish-specific characters
+  if (/[ğşıüöçĞŞİÜÖÇ]/.test(message)) return 'tr';
+  const arabicChars = (message.match(/[؀-ۿ]/g) || []).length;
+  const total = message.replace(/\s/g, '').length;
+  if (total > 0 && arabicChars / total > 0.3) {
+    const persianSpecific = (message.match(/[پچژگ]/g) || []).length;
+    const urduSpecific    = (message.match(/[ٹڈڑں]/g) || []).length;
+    if (urduSpecific > persianSpecific) return 'ur';
+    if (persianSpecific > 0)            return 'fa';
+    return 'ar';
+  }
+  return 'en';
+}
+
+function buildLimitMessage(lang: 'fa' | 'ar' | 'tr' | 'ur' | 'en'): string {
+  switch (lang) {
+    case 'fa':
+      return 'مولانا می‌گوید:\n«آتش عشق است کاندر نی فتاد — بی‌قراری‌ها از آن آتش بزاد»\n\nامروز به اندازه‌ای که سهم ما بود کنارت بودم. برای ادامه گفتگو می‌توانی پرو را فعال کنی.';
+    case 'ar':
+      return 'قال ابن عطاء الله السكندري:\n«ادفن وجودك في أرض الخمول، فما نبت مما لم يُدفن لا يتمّ نتاجه»\n\nحديثنا لهذا اليوم قد اكتمل. يمكنك تفعيل الاشتراك المميّز للمتابعة.';
+    case 'tr':
+      return 'Yunus Emre der ki:\n«Bir ben vardır bende, benden içeri»\n\nBugün paylaşacaklarımız bu kadardı, dostum. Devam etmek için pro sürümünü etkinleştirebilirsin.';
+    case 'ur':
+      return 'اقبال نے کہا:\n«تو شاہیں ہے، پرواز ہے کام تیرا\nترے سامنے آسماں اور بھی ہیں»\n\nآج کی ہماری گفتگو یہیں تک تھی۔ جاری رکھنے کے لیے پرو ورژن فعال کریں۔';
+    case 'en':
+      return 'Rumi once said:\n"Out beyond ideas of wrongdoing and rightdoing, there is a field. I\'ll meet you there."\n\nWe\'ve shared all we can for today, dear friend. You can activate pro to continue our journey.';
+  }
+}
+
 function buildGeminiHistory(messages: Array<{ role: string; content: string }>) {
   const result: Array<{ role: 'user' | 'model'; parts: [{ text: string }] }> = [];
   for (const m of messages) {
@@ -716,8 +749,9 @@ export async function POST(request: NextRequest) {
     const todayCount = countRow?.count ?? 0;
 
     if (todayCount >= 70) {
+      const userLang = detectUserLanguage(message, identityResult.data?.language);
       return NextResponse.json({
-        reply: 'امروز به اندازه‌ای که سهم ما بود با هم بودیم. برای ادامه چت میتونی pro را فعال کنی',
+        reply: buildLimitMessage(userLang),
         limitReached: true,
       });
     }
