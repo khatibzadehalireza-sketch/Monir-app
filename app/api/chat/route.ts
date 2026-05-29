@@ -215,11 +215,36 @@ const LIFE_EVENT_EXTRACT_PROMPT = `از پیام کاربر، رویدادهای
 
 فقط JSON خالص بدون توضیح.`;
 
+// نسخه پویا با سال جاری و فیلد emotional_impact
+function buildLifeEventPrompt(currentYear: number): string {
+  const lastYear = currentYear - 1;
+  return `از مکالمه زیر، رویدادهای مهم زندگی رو استخراج کن.
+فقط اگه یک رویداد مشخص و مهم ذکر شده باشه — مثل: مرگ عزیزان، طلاق، مهاجرت، بیماری جدی، از دست دادن شغل، ازدواج، تولد فرزند، پایان رابطه، بحران مالی، جدایی از خانواده.
+کاربر ممکنه به فارسی، عربی، ترکی، اردو یا انگلیسی صحبت کنه — همان زبان را تشخیص بده.
+
+اگه هیچ رویداد مهمی نیست: {"detected": false}
+
+در غیر این صورت:
+{
+  "detected": true,
+  "event_type": "نوع رویداد به زبان کاربر، حداکثر ۴ کلمه",
+  "event_year": عدد سال میلادی یا null (سال فعلی: ${currentYear} — «سال پیش» یعنی ${lastYear}),
+  "impact_on_faith": عدد صحیح -3 تا +3 (منفی=ایمان ضعیف‌تر، مثبت=ایمان قوی‌تر، 0=نامشخص),
+  "emotional_impact": عدد صحیح 1 تا 10 (شدت تأثیر احساسی کلی — 1=کم، 10=بسیار شدید),
+  "description": "خلاصه یک‌جمله‌ای از رویداد",
+  "current_life_pressure": "فشار فعلی ناشی از این رویداد (اگه مشخص باشه، وگرنه null)",
+  "support_network": "شبکه حمایتی که ذکر شده (اگه مشخص باشه، وگرنه null)"
+}
+
+فقط JSON خالص بدون توضیح.`;
+}
+
 interface LifeEventData {
   detected: boolean;
   event_type?: string;
   event_year?: number | null;
   impact_on_faith?: number;
+  emotional_impact?: number;
   description?: string;
   current_life_pressure?: string | null;
   support_network?: string | null;
@@ -714,7 +739,7 @@ export async function POST(request: NextRequest) {
 
     // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی + before scores در parallel ---
     const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
-    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult] = await Promise.all([
+    const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult, existingLifeEventsResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('conversations').select('role, content').eq('user_id', userId)
@@ -730,6 +755,8 @@ export async function POST(request: NextRequest) {
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       supabase.from('behavioral_patterns').select('*').eq('user_id', userId).maybeSingle(),
+      supabase.from('life_events').select('event_type, event_year').eq('user_id', userId)
+        .order('created_at', { ascending: false }).limit(30),
     ]);
 
     if (countResult.error)       console.error('[supabase] message_counts:', countResult.error.message);
@@ -738,6 +765,7 @@ export async function POST(request: NextRequest) {
     if (identityResult.error)    console.error('[supabase] user_identity:', identityResult.error.message);
     if ((sessionBeforeResult as any)?.error) console.error('[supabase] before_scores:', (sessionBeforeResult as any).error.message);
     if ((bpResult as any)?.error) console.error('[supabase] behavioral_patterns:', (bpResult as any).error.message);
+    if ((existingLifeEventsResult as any)?.error) console.error('[supabase] life_events:', (existingLifeEventsResult as any).error.message);
 
     const beforeRow = (sessionBeforeResult as any)?.data as
       { before_hope: number | null; before_anxiety: number | null } | null;
@@ -759,6 +787,8 @@ export async function POST(request: NextRequest) {
     const currentProfile: Record<string, any> = profileRow ?? {};
     const currentIdentity: Record<string, any> = identityResult.data ?? {};
     const currentBP: Record<string, any> | null = (bpResult as any).data ?? null;
+    const existingLifeEvents: Array<{ event_type: string | null; event_year: number | null }> =
+      (existingLifeEventsResult as any).data ?? [];
     const history = rawHistory ? [...rawHistory].reverse() : [];
 
     // اوقات شرعی: اگه ipCity نداشتیم، از شهر ذخیره‌شده در هویت استفاده کن
@@ -914,13 +944,19 @@ export async function POST(request: NextRequest) {
 
       // ── رویدادهای مهم زندگی ─────────────────────────────────────────────────
       (async (): Promise<LifeEventData | null> => {
+        // Include recent conversation context so events spanning multiple messages are caught
+        const lifeEventCtx = [
+          ...history.slice(-5).map((h: any) =>
+            `${h.role === 'user' ? 'کاربر' : 'منیر'}: ${h.content}`),
+          `کاربر: ${message}`,
+        ].join('\n');
         const res = await groq.chat.completions.create({
           model: 'llama-3.1-8b-instant',
           messages: [
-            { role: 'system', content: LIFE_EVENT_EXTRACT_PROMPT },
-            { role: 'user',   content: message },
+            { role: 'system', content: buildLifeEventPrompt(new Date().getFullYear()) },
+            { role: 'user',   content: lifeEventCtx },
           ],
-          max_tokens: 200,
+          max_tokens: 250,
           temperature: 0.1,
           response_format: { type: 'json_object' },
         });
@@ -1110,15 +1146,23 @@ export async function POST(request: NextRequest) {
 
     // ── life_events: رویداد مهم زندگی (insert — هر رویداد یک رکورد جدید) ──────
     if (newLifeEvent) {
-      supabase.from('life_events').insert({
-        user_id:               userId,
-        event_type:            newLifeEvent.event_type            ?? null,
-        event_year:            newLifeEvent.event_year            ?? null,
-        impact_on_faith:       newLifeEvent.impact_on_faith       ?? 0,
-        description:           newLifeEvent.description           ?? null,
-        current_life_pressure: newLifeEvent.current_life_pressure ?? null,
-        support_network:       newLifeEvent.support_network       ?? null,
-      }).then(({ error }) => { if (error) console.error('[life_event insert]', error.message); });
+      // Deduplication: skip if same event_type + year already recorded for this user
+      const isDuplicateLifeEvent = existingLifeEvents.some(
+        e => e.event_type === newLifeEvent.event_type &&
+             (e.event_year === newLifeEvent.event_year || newLifeEvent.event_year == null),
+      );
+      if (!isDuplicateLifeEvent) {
+        supabase.from('life_events').insert({
+          user_id:               userId,
+          event_type:            newLifeEvent.event_type            ?? null,
+          event_year:            newLifeEvent.event_year            ?? null,
+          impact_on_faith:       newLifeEvent.impact_on_faith       ?? 0,
+          emotional_impact:      newLifeEvent.emotional_impact      ?? null,
+          description:           newLifeEvent.description           ?? null,
+          current_life_pressure: newLifeEvent.current_life_pressure ?? null,
+          support_network:       newLifeEvent.support_network       ?? null,
+        }).then(({ error }) => { if (error) console.error('[life_event insert]', error.message); });
+      }
     }
 
     // ── user_identity: هویت دموگرافیک (fire-and-forget) ─────────────────────
