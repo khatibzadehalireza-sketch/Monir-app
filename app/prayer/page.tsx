@@ -110,6 +110,16 @@ export default function PrayerPage() {
   const [playing,  setPlaying]  = useState<string|null>(null);
   const audioRef               = useRef<HTMLAudioElement|null>(null);
 
+  // Auto-azan
+  const [autoAzan,   setAutoAzan]   = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('monir_auto_azan') === '1';
+  });
+  const [azanToast,  setAzanToast]  = useState<string|null>(null);
+  const autoAzanRef       = useRef(autoAzan);
+  const timingsRef        = useRef<Timings|null>(null);
+  const lastAutoPlayedRef = useRef('');
+
   // ── 1. Request GPS ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!navigator.geolocation) { setLocStatus('denied'); return; }
@@ -125,6 +135,10 @@ export default function PrayerPage() {
       { enableHighAccuracy: false, timeout: 12000, maximumAge: 300_000 },
     );
   }, []);
+
+  // Keep auto-azan refs in sync with state
+  useEffect(() => { autoAzanRef.current = autoAzan; }, [autoAzan]);
+  useEffect(() => { timingsRef.current  = timings;  }, [timings]);
 
   // ── 2. Fetch prayer times ───────────────────────────────────────────────────
   useEffect(() => {
@@ -149,10 +163,34 @@ export default function PrayerPage() {
       .catch(() => {});
   }, [coords]);
 
-  // ── 3. Live countdown ───────────────────────────────────────────────────────
+  // ── 3. Live countdown + auto-azan trigger ──────────────────────────────────
   useEffect(() => {
     if (!next) return;
-    const tick = () => { setCd(makeCountdown(next.time)); };
+    const tick = () => {
+      setCd(makeCountdown(next.time));
+      if (!autoAzanRef.current || !timingsRef.current) return;
+      const now    = new Date();
+      const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      for (const p of PRAYER_ORDER) {
+        const pTime = (timingsRef.current[p] ?? '').slice(0, 5);
+        if (pTime !== nowStr) continue;
+        const key = `${p}-${nowStr}`;
+        if (lastAutoPlayedRef.current === key) break;
+        lastAutoPlayedRef.current = key;
+        // Stop any currently playing audio and start the azan
+        if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+        const src = p === 'Fajr' ? ADHAN_FAJR_URL : ADHAN_URL;
+        const a   = new Audio(src);
+        audioRef.current = a;
+        a.play().catch(() => {});
+        a.onended = () => { setPlaying(null); audioRef.current = null; };
+        setPlaying(p);
+        setAzanToast(PRAYER_FA[p] ?? p);
+        setTimeout(() => setAzanToast(null), 7000);
+        setNext(getNextPrayer(timingsRef.current));
+        break;
+      }
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -198,6 +236,16 @@ export default function PrayerPage() {
     setPlaying(prayerKey);
   }, [playing]);
 
+  // ── 7. Auto-azan toggle ─────────────────────────────────────────────────────
+  const toggleAutoAzan = useCallback(() => {
+    setAutoAzan(v => {
+      const next = !v;
+      localStorage.setItem('monir_auto_azan', next ? '1' : '0');
+      autoAzanRef.current = next;
+      return next;
+    });
+  }, []);
+
   // Needle angle in screen-space = absolute Qibla bearing minus device heading
   const needleAngle = qibla !== null ? (qibla - (compassActive ? compassHead : 0) + 360) % 360 : 0;
 
@@ -228,7 +276,18 @@ export default function PrayerPage() {
 
         <div className="scroll">
 
-          {/* ── Location status ── */}
+          {/* ── Auto-azan toast ── */}
+        {azanToast && (
+          <div className="azan-toast">
+            <span className="azan-toast-icon">🕌</span>
+            <div className="azan-toast-text">
+              <span className="azan-toast-title">وقت نماز {azanToast}</span>
+              <span className="azan-toast-sub">اذان در حال پخش است</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Location status ── */}
           {locStatus === 'requesting' && (
             <div className="loc-card">
               <span className="spinner-sm"/>
@@ -287,7 +346,18 @@ export default function PrayerPage() {
           {/* ── Prayer times list ── */}
           {timings && (
             <section className="section">
-              <h3 className="sec-title"><span>🕐</span> اوقات نماز</h3>
+              <div className="sec-title-row">
+                <h3 className="sec-title"><span>🕐</span> اوقات نماز</h3>
+                <button
+                  className={`auto-azan-btn${autoAzan ? ' auto-azan-on' : ''}`}
+                  onClick={toggleAutoAzan}
+                  aria-label={autoAzan ? 'غیرفعال کردن اذان خودکار' : 'فعال کردن اذان خودکار'}
+                  title={autoAzan ? 'اذان خودکار فعال است' : 'اذان خودکار غیرفعال است'}
+                >
+                  {autoAzan ? '🔔' : '🔕'}
+                  <span>{autoAzan ? 'اذان خودکار' : 'اذان خودکار'}</span>
+                </button>
+              </div>
               <div className="prayer-list">
                 {PRAYER_KEYS.map(key => {
                   const time  = timings[key];
@@ -674,6 +744,51 @@ export default function PrayerPage() {
           font-size:12px; color:rgba(212,160,23,0.45);
           text-align:center;
         }
+
+        /* ── auto-azan ── */
+        .sec-title-row {
+          display:flex; align-items:center; justify-content:space-between;
+        }
+        .auto-azan-btn {
+          display:flex; align-items:center; gap:5px;
+          padding:6px 12px;
+          background:rgba(212,160,23,0.08);
+          border:1px solid rgba(212,160,23,0.22);
+          border-radius:20px;
+          color:rgba(212,160,23,0.55);
+          font-size:11.5px; font-family:'Vazirmatn',sans-serif;
+          cursor:pointer; transition:all .2s; white-space:nowrap;
+        }
+        .auto-azan-btn:hover { background:rgba(212,160,23,0.15); color:rgba(212,160,23,0.80); }
+        .auto-azan-btn.auto-azan-on {
+          background:rgba(212,160,23,0.16);
+          border-color:rgba(212,160,23,0.50);
+          color:#d4a017;
+          box-shadow:0 0 8px rgba(212,160,23,0.25);
+        }
+
+        /* ── azan toast ── */
+        .azan-toast {
+          position:fixed; top:80px; left:50%; transform:translateX(-50%);
+          z-index:100;
+          display:flex; align-items:center; gap:12px;
+          padding:14px 20px;
+          background:rgba(8,14,32,0.96);
+          border:1px solid rgba(212,160,23,0.55);
+          border-radius:18px;
+          backdrop-filter:blur(24px);
+          box-shadow:0 8px 40px rgba(0,0,0,0.70),0 0 40px rgba(212,160,23,0.12);
+          animation:toastIn .4s cubic-bezier(.22,.68,0,1.2) both;
+          min-width:220px; max-width:calc(100vw - 32px);
+        }
+        @keyframes toastIn {
+          from { opacity:0; transform:translateX(-50%) translateY(-14px) scale(.94); }
+          to   { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+        }
+        .azan-toast-icon { font-size:26px; flex-shrink:0; }
+        .azan-toast-text { display:flex; flex-direction:column; gap:2px; }
+        .azan-toast-title { font-size:15px; font-weight:600; color:#e8d5a0; }
+        .azan-toast-sub   { font-size:12px; color:rgba(212,160,23,0.55); }
       `}</style>
     </>
   );
