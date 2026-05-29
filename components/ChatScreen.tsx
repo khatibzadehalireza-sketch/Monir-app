@@ -1,16 +1,39 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
 
+type ChatIntent = 'story' | 'post' | 'prayer' | 'qibla' | 'profile';
+
+function detectChatIntent(text: string): ChatIntent | null {
+  if (/استوری/.test(text))       return 'story';
+  if (/پست/.test(text))          return 'post';
+  if (/نماز|اذان/.test(text))    return 'prayer';
+  if (/قبله/.test(text))         return 'qibla';
+  if (/پروفایل/.test(text))      return 'profile';
+  return null;
+}
+
+const INTENT_REPLIES: Record<ChatIntent, string> = {
+  story:   'باشه، ویرایشگر استوری رو برات باز می‌کنم ✦',
+  post:    'باشه، ویرایشگر پست رو برات باز می‌کنم ✦',
+  prayer:  'آوردم اوقات شرعی رو برات 🕌',
+  qibla:   'آوردم قبله‌نما رو برات 🧭',
+  profile: 'داری می‌بری به پروفایل 👤',
+};
+
 interface Props {
   onBack: () => void;
   userName: string;
+  onOpenPost?: () => void;
 }
 
-export function ChatScreen({ onBack, userName }: Props) {
+export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
+  const router = useRouter();
+
   const [messages,          setMessages]          = useState<Message[]>([]);
   const [input,             setInput]             = useState("");
   const [isLoading,         setIsLoading]         = useState(false);
@@ -60,6 +83,18 @@ export function ChatScreen({ onBack, userName }: Props) {
     setMessages(p => [...p, userMsg]);
     setInput("");
     if (taRef.current) taRef.current.style.height = "auto";
+
+    const intent = detectChatIntent(text);
+    if (intent) {
+      setTimeout(() => setMessages(p => [...p, { role: "assistant", content: INTENT_REPLIES[intent], id: Date.now().toString() }]), 400);
+      setTimeout(() => {
+        if (intent === 'story' || intent === 'post') onOpenPost?.();
+        else if (intent === 'prayer' || intent === 'qibla') router.push('/prayer');
+        else if (intent === 'profile') router.push('/profile');
+      }, 900);
+      return;
+    }
+
     setIsLoading(true);
     msgCount.current++;
     try {
@@ -88,7 +123,7 @@ export function ChatScreen({ onBack, userName }: Props) {
     } catch {
       setMessages(p => [...p, { role: "assistant", content: "فرزندم... ارتباط قطع شد.", id: Date.now().toString() }]);
     } finally { setIsLoading(false); }
-  }, [input, isLoading, messages, userName]);
+  }, [input, isLoading, messages, userName, onOpenPost, router]);
 
   const onKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }

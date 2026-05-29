@@ -269,7 +269,11 @@ export default function App() {
 
         {/* ══ CHAT SCREEN ══ */}
         {screen === "chat" && (
-          <ChatScreen onBack={() => setScreen("home")} userName={userName} />
+          <ChatScreen
+            onBack={() => setScreen("home")}
+            userName={userName}
+            onOpenPost={() => userId ? setShowNew(true) : router.push("/login")}
+          />
         )}
       </div>
 
