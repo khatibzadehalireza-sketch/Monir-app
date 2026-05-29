@@ -749,7 +749,13 @@ export async function POST(request: NextRequest) {
       ? `\n【این کاربر ${daysSinceSeen} روز غایب بوده — با گرمی و بدون ارجاع به گذشته شروع کن، انگار اولین مکالمه‌ست】\n`
       : '';
 
-    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + freshStartNote + SYSTEM_PROMPT;
+    const _now = new Date();
+    const dateContext =
+      `\n【تاریخ و ساعت جاری: ${_now.toISOString().slice(0, 10)} — ${_now.toISOString().slice(11, 16)} UTC` +
+      (timezone ? ` | منطقه زمانی کاربر: ${timezone}` : '') +
+      `】\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + freshStartNote + dateContext + SYSTEM_PROMPT;
 
     const repairedMessage = repairShortQuery(message, history);
     const groqMessages = [
