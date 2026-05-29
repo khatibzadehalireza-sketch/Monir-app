@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
+const QURAN_STREAM = "https://cdn.islamic.network/quran/audio-surah/128/ar.alafasy/55.mp3";
 
 type ChatIntent = 'story' | 'post' | 'prayer' | 'qibla' | 'profile';
 
@@ -46,6 +47,9 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
   const sessionStart     = useRef(new Date().toISOString());
   const msgCount         = useRef(0);
   const feedbackShownRef = useRef(false);
+  const audioRef         = useRef<HTMLAudioElement | null>(null);
+
+  const [isReciting, setIsReciting] = useState(false);
 
   /* Opening message on first mount */
   useEffect(() => {
@@ -57,6 +61,25 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
   }, []);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
+
+  useEffect(() => {
+    return () => { audioRef.current?.pause(); audioRef.current = null; };
+  }, []);
+
+  const toggleRecitation = useCallback(() => {
+    if (isReciting) {
+      audioRef.current?.pause();
+      setIsReciting(false);
+    } else {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(QURAN_STREAM);
+        audioRef.current.loop = true;
+        audioRef.current.volume = 0.35;
+      }
+      audioRef.current.play().catch(() => {});
+      setIsReciting(true);
+    }
+  }, [isReciting]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -145,6 +168,16 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
           </div>
         </div>
         <div className="hverse">أَفَلَا تَتَفَکَّرُونَ</div>
+        <button
+          className={`ibtn qrn-btn${isReciting ? " qrn-on" : ""}`}
+          onClick={toggleRecitation}
+          title={isReciting ? "توقف تلاوت" : "تلاوت قرآن"}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+        </button>
       </header>
 
       <div className="msgs">

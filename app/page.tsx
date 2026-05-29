@@ -1240,6 +1240,20 @@ export default function App() {
           .story-av { width: 70px; height: 70px; }
           .post-content { font-size: 14.5px; }
         }
+
+        /* ── Quran recitation toggle ── */
+        .qrn-btn { flex-shrink: 0; }
+        .qrn-on {
+          background: rgba(212,160,23,0.18) !important;
+          border-color: rgba(212,160,23,0.48) !important;
+          color: #d4a017 !important;
+          box-shadow: 0 0 14px rgba(212,160,23,0.40), 0 0 30px rgba(212,160,23,0.14) !important;
+        }
+        .qrn-on svg { animation: qrn-wave 2s ease-in-out infinite; }
+        @keyframes qrn-wave {
+          0%, 100% { opacity: 0.65; transform: scale(1); }
+          50%       { opacity: 1;    transform: scale(1.12); }
+        }
       `}</style>
     </>
   );
