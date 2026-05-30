@@ -15,6 +15,9 @@ export function MonirChatFAB() {
     }
   };
 
+  /* orb on home page is the primary entry point — no duplicate FAB there */
+  if (pathname === "/") return null;
+
   return (
     <>
       <button className="mcf" onClick={open} aria-label="چت با منیر">

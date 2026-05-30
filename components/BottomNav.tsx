@@ -94,8 +94,10 @@ export function BottomNav({ activeTab, onTab }: Props) {
           onClick={() => onTab(t.id)}
           aria-label={t.label}
         >
-          {activeTab === t.id && <span className="ni-pip" />}
-          {t.icon}
+          <div className="ni-circle">
+            {activeTab === t.id && <span className="ni-pip" />}
+            {t.icon}
+          </div>
           <span>{t.label}</span>
         </button>
       ))}

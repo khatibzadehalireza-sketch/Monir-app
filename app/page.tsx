@@ -10,8 +10,7 @@ import { BottomNav }     from "@/components/BottomNav";
 import type { Tab }      from "@/components/BottomNav";
 import { ChatScreen }    from "@/components/ChatScreen";
 import { LiveStreams }   from "@/components/LiveStreams";
-import { ErrorBoundary }    from "@/components/ErrorBoundary";
-import { StarfieldCanvas } from "@/components/StarfieldCanvas";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { Post }   from "@/lib/types";
 
 /* ─── New Post Modal ──────────────────────────────── */
@@ -258,8 +257,22 @@ export default function App() {
   /* ── Render ──────────────────────────────────────── */
   return (
     <>
-      <div className="bg" />
-      <StarfieldCanvas />
+      {/* NASA galaxy video — loops silently, covers full screen */}
+      <div className="bg">
+        <video
+          className="galaxy-video"
+          autoPlay
+          loop
+          muted
+          playsInline
+          aria-hidden="true"
+        >
+          {/* NASA SVS — Hubble eXtreme Deep Field fly-through (public domain) */}
+          <source src="https://svs.gsfc.nasa.gov/vis/a000000/a004200/a004234/HubbleXDF_web.mp4" type="video/mp4" />
+          {/* Pixabay CC-0 space fallback if NASA CDN is unavailable */}
+          <source src="https://cdn.pixabay.com/video/2016/09/01/4906-181579791_large.mp4" type="video/mp4" />
+        </video>
+      </div>
 
       <div className="app">
 
@@ -427,20 +440,25 @@ export default function App() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; background: #020a1a; overflow: hidden; }
 
-        /* ── Galaxy background ── */
+        /* ── Galaxy video background ── */
         .bg {
           position: fixed; inset: 0; z-index: 0;
-          background-image: url('https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1080&q=85');
-          background-size: cover; background-position: center;
+          overflow: hidden;
+          background: #020a1a; /* fallback colour if video fails */
+        }
+        .galaxy-video {
+          position: absolute; inset: 0;
+          width: 100%; height: 100%;
+          object-fit: cover; pointer-events: none;
         }
         .bg::after {
-          content: ''; position: absolute; inset: 0;
+          content: ''; position: absolute; inset: 0; z-index: 1;
           background:
             radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,160,23,0.06) 0%, transparent 60%),
             linear-gradient(180deg,
-              rgba(2,8,22,0.70) 0%,
-              rgba(3,9,22,0.58) 30%,
-              rgba(4,6,18,0.72) 65%,
+              rgba(2,8,22,0.72) 0%,
+              rgba(3,9,22,0.62) 30%,
+              rgba(4,6,18,0.78) 65%,
               rgba(3,4,12,0.97) 100%);
         }
 
@@ -829,61 +847,62 @@ export default function App() {
         }
 
         /* ════════════════════════════════════════════
-           BOTTOM NAV
+           BOTTOM NAV — circular tabs
         ════════════════════════════════════════════ */
         .ig-bnav {
-          display: flex; align-items: center; justify-content: space-around;
-          padding: 10px 4px 22px; flex-shrink: 0;
-          background: linear-gradient(180deg, rgba(2,5,18,0.94) 0%, rgba(1,3,12,0.98) 100%);
+          display: flex; align-items: flex-end; justify-content: space-around;
+          padding: 8px 2px 18px; flex-shrink: 0;
+          background: linear-gradient(180deg, rgba(2,5,18,0.95) 0%, rgba(1,3,12,0.99) 100%);
           backdrop-filter: blur(30px) saturate(160%);
-          border-top: 1px solid rgba(212,160,23,0.10);
-          box-shadow: 0 -1px 0 rgba(212,160,23,0.05), 0 -8px 32px rgba(0,0,0,0.55);
+          border-top: 1px solid rgba(212,160,23,0.12);
+          box-shadow: 0 -1px 0 rgba(212,160,23,0.06), 0 -8px 32px rgba(0,0,0,0.60);
         }
+
         .ni {
-          display: flex; flex-direction: column; align-items: center; gap: 3px;
+          display: flex; flex-direction: column; align-items: center; gap: 4px;
           border: none; background: none; cursor: pointer;
-          color: rgba(212,160,23,0.28);
+          color: rgba(212,160,23,0.30);
           font-family: 'Vazirmatn', sans-serif;
-          font-size: 9px; font-weight: 400;
-          padding: 4px 3px;
+          font-size: 8px; font-weight: 400;
+          padding: 2px 0;
           transition: color .22s, transform .15s;
-          min-width: 38px; position: relative;
-          flex: 1;
+          flex: 1; position: relative; min-width: 0;
         }
-        .ni:hover { color: rgba(212,160,23,0.55); transform: translateY(-1px); }
+        .ni:hover  { color: rgba(212,160,23,0.65); transform: translateY(-1px); }
         .ni:active { transform: scale(0.90); }
+        .ni-on     { color: #d4a017; }
+        .ni-on svg { filter: drop-shadow(0 0 4px rgba(212,160,23,0.55)); }
 
-        .ni-on {
-          color: #d4a017;
-          filter: drop-shadow(0 0 6px rgba(212,160,23,0.45));
-        }
-        .ni-on svg { filter: drop-shadow(0 0 4px rgba(212,160,23,0.50)); }
-
-        .ni-pip {
-          position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
-          width: 18px; height: 2px; border-radius: 2px;
-          background: linear-gradient(90deg, #d4a017, #f5d060);
-          box-shadow: 0 0 8px rgba(212,160,23,0.70);
-        }
-
-        .ni-post {
-          width: 46px; height: 46px;
-          background: linear-gradient(135deg, rgba(212,160,23,0.18), rgba(212,160,23,0.10));
-          border: 1.5px solid rgba(212,160,23,0.35);
-          border-radius: 14px;
+        /* Golden ring around each tab icon */
+        .ni-circle {
+          width: 38px; height: 38px; border-radius: 50%;
+          border: 1.5px solid rgba(212,160,23,0.20);
+          background: rgba(212,160,23,0.03);
           display: flex; align-items: center; justify-content: center;
-          color: #d4a017;
-          padding: 0; min-width: 46px;
-          transition: all .22s;
-          box-shadow: inset 0 1px 0 rgba(245,208,96,0.12);
+          position: relative;
+          transition: border-color .22s, box-shadow .22s, background .22s;
         }
-        .ni-post:hover {
-          background: linear-gradient(135deg, rgba(212,160,23,0.30), rgba(212,160,23,0.18));
-          border-color: rgba(212,160,23,0.65);
-          box-shadow: 0 0 20px rgba(212,160,23,0.35), inset 0 1px 0 rgba(245,208,96,0.20);
-          transform: translateY(-2px);
+        .ni:hover .ni-circle {
+          border-color: rgba(212,160,23,0.42);
+          box-shadow: 0 0 10px rgba(212,160,23,0.28);
         }
-        .ni-post:active { transform: scale(0.90); }
+        .ni-on .ni-circle {
+          border-color: rgba(212,160,23,0.85);
+          background: rgba(212,160,23,0.10);
+          box-shadow:
+            0 0 14px rgba(212,160,23,0.65),
+            0 0 30px rgba(212,160,23,0.32),
+            0 0 55px rgba(212,160,23,0.14),
+            inset 0 0 10px rgba(212,160,23,0.10);
+        }
+
+        /* Active dot at top of circle */
+        .ni-pip {
+          position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+          width: 5px; height: 5px; border-radius: 50%;
+          background: #f5d060;
+          box-shadow: 0 0 6px rgba(212,160,23,1), 0 0 12px rgba(212,160,23,0.70);
+        }
 
         /* ════════════════════════════════════════════
            CHAT SCREEN
@@ -1481,22 +1500,25 @@ export default function App() {
           flex-shrink: 0;
         }
 
-        /* Allah calligraphy — purely decorative, behind the orb */
+        /* Allah calligraphy — large golden glyph behind the orb */
         .allah-calli {
           position: absolute;
-          font-size: 108px;
+          font-size: 200px;
           font-family: 'Vazirmatn', sans-serif;
           font-weight: 700;
           color: #d4a017;
-          opacity: 0.042;
+          opacity: 0.13;
           user-select: none;
           pointer-events: none;
           letter-spacing: -0.02em;
           line-height: 1;
-          filter: blur(0.4px);
+          filter: blur(0.3px);
           text-shadow:
-            0 0 60px rgba(212,160,23,0.55),
-            0 0 120px rgba(212,160,23,0.28);
+            0 0  18px rgba(212,160,23,1.00),
+            0 0  45px rgba(212,160,23,0.90),
+            0 0  90px rgba(212,160,23,0.70),
+            0 0 180px rgba(212,160,23,0.45),
+            0 0 340px rgba(212,160,23,0.22);
           z-index: 0;
         }
 
