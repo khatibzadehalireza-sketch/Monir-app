@@ -10,7 +10,8 @@ import { BottomNav }     from "@/components/BottomNav";
 import type { Tab }      from "@/components/BottomNav";
 import { ChatScreen }    from "@/components/ChatScreen";
 import { LiveStreams }   from "@/components/LiveStreams";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary }    from "@/components/ErrorBoundary";
+import { StarfieldCanvas } from "@/components/StarfieldCanvas";
 import type { Post }   from "@/lib/types";
 
 /* ─── New Post Modal ──────────────────────────────── */
@@ -258,6 +259,7 @@ export default function App() {
   return (
     <>
       <div className="bg" />
+      <StarfieldCanvas />
 
       <div className="app">
 
