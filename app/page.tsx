@@ -7,6 +7,7 @@ import { Header }        from "@/components/Header";
 import { StoriesBar }    from "@/components/StoriesBar";
 import { PostFeed }      from "@/components/PostFeed";
 import { BottomNav }     from "@/components/BottomNav";
+import type { Tab }      from "@/components/BottomNav";
 import { ChatScreen }    from "@/components/ChatScreen";
 import { LiveStreams }   from "@/components/LiveStreams";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -134,7 +135,8 @@ function NewPostModal({
 
 /* ─── Main App ────────────────────────────────────── */
 export default function App() {
-  const [screen, setScreen] = useState<"home" | "chat">("home");
+  const [screen,    setScreen]    = useState<"home" | "chat" | "live">("home");
+  const [activeTab, setActiveTab] = useState<Tab>("monir");
 
   /* auth */
   const [userId,     setUserId]     = useState<string | null>(null);
@@ -242,6 +244,16 @@ export default function App() {
     setShowOnboarding(false);
   }, [onboardingName, onboardingAge]);
 
+  const handleTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    if (tab === "live")      { setScreen("live");      return; }
+    if (tab === "help")      { setScreen("chat");      return; }
+    if (tab === "prayer")    { router.push("/prayer"); return; }
+    if (tab === "notebook")  { router.push("/memory"); return; }
+    if (tab === "quran")     { router.push("/quran");  return; }
+    setScreen("home"); // monir + community both show home
+  }, [router]);
+
   /* ── Render ──────────────────────────────────────── */
   return (
     <>
@@ -255,32 +267,41 @@ export default function App() {
             <ErrorBoundary silent>
               <Header />
             </ErrorBoundary>
+
+            {/* ── Monir orb hero ── */}
+            <div className="orb-hero">
+              <div className="allah-calli" aria-hidden="true">ٱللَّٰه</div>
+              <button
+                className="monir-orb"
+                onClick={() => setScreen("chat")}
+                aria-label="باز کردن منیر"
+              >
+                <div className="monir-orb-core">✦</div>
+              </button>
+            </div>
+
+            {/* ── Feed — only rendered when posts exist or loading ── */}
+            {(loadingFeed || posts.length > 0) && (
+              <ErrorBoundary fallback={
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", color: "rgba(212,160,23,0.50)", fontSize: "13px", fontFamily: "Vazirmatn, sans-serif", direction: "rtl" }}>
+                  <span style={{ fontSize: "26px" }}>⚠</span>
+                  <span>خطا در بارگذاری پست‌ها</span>
+                </div>
+              }>
+                <PostFeed
+                  posts={posts}
+                  userId={userId}
+                  loadingFeed={loadingFeed}
+                  loadingMore={loadingMore}
+                  nextCursor={nextCursor}
+                  onLoadMore={() => loadFeed(nextCursor ?? undefined)}
+                  onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
+                />
+              </ErrorBoundary>
+            )}
+
             <ErrorBoundary silent>
-              <LiveStreams />
-            </ErrorBoundary>
-            <ErrorBoundary silent>
-              <StoriesBar onOpenChat={() => setScreen("chat")} />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", color: "rgba(212,160,23,0.50)", fontSize: "13px", fontFamily: "Vazirmatn, sans-serif", direction: "rtl" }}>
-                <span style={{ fontSize: "26px" }}>⚠</span>
-                <span>خطا در بارگذاری پست‌ها</span>
-              </div>
-            }>
-              <PostFeed
-                posts={posts}
-                userId={userId}
-                loadingFeed={loadingFeed}
-                loadingMore={loadingMore}
-                nextCursor={nextCursor}
-                onLoadMore={() => loadFeed(nextCursor ?? undefined)}
-                onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary silent>
-              <BottomNav
-                onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
-              />
+              <BottomNav activeTab={activeTab} onTab={handleTab} />
             </ErrorBoundary>
           </div>
         )}
@@ -300,11 +321,38 @@ export default function App() {
             </div>
           }>
             <ChatScreen
-              onBack={() => setScreen("home")}
+              onBack={() => { setScreen("home"); setActiveTab("community"); }}
               userName={userName}
               onOpenPost={() => userId ? setShowNew(true) : router.push("/login")}
             />
           </ErrorBoundary>
+        )}
+
+        {/* ══ LIVE SCREEN ══ */}
+        {screen === "live" && (
+          <div className="screen live-screen">
+            <div className="live-screen-hdr">
+              <button
+                className="ibtn"
+                onClick={() => { setScreen("home"); setActiveTab("community"); }}
+                aria-label="بازگشت"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+              <span className="live-screen-title">پخش زنده مساجد</span>
+              <div style={{ width: 38 }} />
+            </div>
+            <div className="live-screen-body">
+              <ErrorBoundary silent>
+                <LiveStreams />
+              </ErrorBoundary>
+            </div>
+            <ErrorBoundary silent>
+              <BottomNav activeTab={activeTab} onTab={handleTab} />
+            </ErrorBoundary>
+          </div>
         )}
       </div>
 
@@ -790,14 +838,15 @@ export default function App() {
           box-shadow: 0 -1px 0 rgba(212,160,23,0.05), 0 -8px 32px rgba(0,0,0,0.55);
         }
         .ni {
-          display: flex; flex-direction: column; align-items: center; gap: 4px;
+          display: flex; flex-direction: column; align-items: center; gap: 3px;
           border: none; background: none; cursor: pointer;
           color: rgba(212,160,23,0.28);
           font-family: 'Vazirmatn', sans-serif;
-          font-size: 10px; font-weight: 400;
-          padding: 4px 12px;
+          font-size: 9px; font-weight: 400;
+          padding: 4px 3px;
           transition: color .22s, transform .15s;
-          min-width: 52px; position: relative;
+          min-width: 38px; position: relative;
+          flex: 1;
         }
         .ni:hover { color: rgba(212,160,23,0.55); transform: translateY(-1px); }
         .ni:active { transform: scale(0.90); }
@@ -1418,6 +1467,101 @@ export default function App() {
         @keyframes qrn-wave {
           0%, 100% { opacity: 0.65; transform: scale(1); }
           50%       { opacity: 1;    transform: scale(1.12); }
+        }
+
+        /* ════════════════════════════════════════════
+           MONIR ORB HERO
+        ════════════════════════════════════════════ */
+        .orb-hero {
+          position: relative;
+          display: flex; align-items: center; justify-content: center;
+          padding: 36px 0 28px;
+          flex-shrink: 0;
+        }
+
+        /* Allah calligraphy — purely decorative, behind the orb */
+        .allah-calli {
+          position: absolute;
+          font-size: 108px;
+          font-family: 'Vazirmatn', sans-serif;
+          font-weight: 700;
+          color: #d4a017;
+          opacity: 0.042;
+          user-select: none;
+          pointer-events: none;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          filter: blur(0.4px);
+          text-shadow:
+            0 0 60px rgba(212,160,23,0.55),
+            0 0 120px rgba(212,160,23,0.28);
+          z-index: 0;
+        }
+
+        /* The Monir orb button */
+        .monir-orb {
+          position: relative; z-index: 1;
+          width: 100px; height: 100px; border-radius: 50%;
+          background: radial-gradient(circle at 35% 32%, #fff8d6, #d4a017 44%, #7a5200 90%);
+          border: none; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow:
+            0 0 0 2px rgba(212,160,23,0.18),
+            0 0 40px rgba(212,160,23,0.50),
+            0 0 80px rgba(212,160,23,0.22),
+            0 0 130px rgba(212,160,23,0.10);
+          animation: orb-breathe 4s ease-in-out infinite;
+          transition: transform .18s;
+        }
+        .monir-orb:active { transform: scale(0.94); }
+
+        @keyframes orb-breathe {
+          0%, 100% {
+            box-shadow:
+              0 0 0 2px rgba(212,160,23,0.18),
+              0 0 40px rgba(212,160,23,0.50),
+              0 0 80px rgba(212,160,23,0.22),
+              0 0 130px rgba(212,160,23,0.10);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow:
+              0 0 0 3px rgba(212,160,23,0.28),
+              0 0 60px rgba(212,160,23,0.75),
+              0 0 110px rgba(212,160,23,0.38),
+              0 0 180px rgba(212,160,23,0.16);
+            transform: scale(1.045);
+          }
+        }
+
+        .monir-orb-core {
+          font-size: 36px; color: #06080f;
+          font-weight: 700; line-height: 1;
+          filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+          animation: orb-breathe 4s ease-in-out infinite reverse;
+        }
+
+        /* ════════════════════════════════════════════
+           LIVE SCREEN
+        ════════════════════════════════════════════ */
+        .live-screen { display: flex; flex-direction: column; }
+
+        .live-screen-hdr {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 18px; flex-shrink: 0;
+          background: linear-gradient(180deg, rgba(2,7,22,0.96) 0%, rgba(3,9,24,0.88) 100%);
+          backdrop-filter: blur(28px) saturate(180%);
+          border-bottom: 1px solid rgba(212,160,23,0.10);
+        }
+        .live-screen-title {
+          font-size: 15px; font-weight: 700;
+          background: linear-gradient(135deg, #f5d060, #d4a017);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .live-screen-body {
+          flex: 1; overflow-y: auto; min-height: 0;
+          padding: 20px 0;
         }
       `}</style>
     </>
