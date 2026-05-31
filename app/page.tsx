@@ -3,20 +3,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
-import { Header }        from "@/components/Header";
-import { StoriesBar }    from "@/components/StoriesBar";
-import { PostFeed }      from "@/components/PostFeed";
-import { BottomNav }     from "@/components/BottomNav";
-import type { Tab }      from "@/components/BottomNav";
-import { ChatScreen }    from "@/components/ChatScreen";
-import { LiveStreams }   from "@/components/LiveStreams";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { StarfieldCanvas } from "@/components/StarfieldCanvas";
-import type { Post }   from "@/lib/types";
+import { GalaxyBackground } from "@/components/GalaxyBackground";
+import { HomeScreen }        from "@/components/HomeScreen";
+import { ChatScreen }        from "@/components/ChatScreen";
+import { LiveStreams }        from "@/components/LiveStreams";
+import { BottomNav }         from "@/components/BottomNav";
+import type { Tab }          from "@/components/BottomNav";
+import { ErrorBoundary }     from "@/components/ErrorBoundary";
+import type { Post }         from "@/lib/types";
 
 /* ─── New Post Modal ──────────────────────────────── */
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_BYTES = 5 * 1024 * 1024;
 
 function NewPostModal({
   userId, authorName, onClose, onCreated,
@@ -68,7 +66,6 @@ function NewPostModal({
         if (uploadErr) { setError("خطا در آپلود عکس. دوباره امتحان کن."); return; }
         imageUrl = supabase.storage.from("post-images").getPublicUrl(path).data.publicUrl;
       }
-
       const res  = await fetch("/api/posts", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, content: text.trim(), imageUrl }),
@@ -247,81 +244,36 @@ export default function App() {
 
   const handleTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
-    if (tab === "live")      { setScreen("live");      return; }
-    if (tab === "help")      { setScreen("chat");      return; }
-    if (tab === "prayer")    { router.push("/prayer"); return; }
-    if (tab === "notebook")  { router.push("/memory"); return; }
-    if (tab === "quran")     { router.push("/quran");  return; }
-    setScreen("home"); // monir + community both show home
+    if (tab === "live")     { setScreen("live");      return; }
+    if (tab === "help")     { setScreen("chat");      return; }
+    if (tab === "prayer")   { router.push("/prayer"); return; }
+    if (tab === "notebook") { router.push("/memory"); return; }
+    if (tab === "quran")    { router.push("/quran");  return; }
+    setScreen("home");
   }, [router]);
 
   /* ── Render ──────────────────────────────────────── */
   return (
     <>
       <div className="bg"></div>
-      <StarfieldCanvas />
+      <GalaxyBackground />
 
       <div className="app">
 
         {/* ══ HOME SCREEN ══ */}
         {screen === "home" && (
-          <div className="screen home">
-            <ErrorBoundary silent>
-              <Header />
-            </ErrorBoundary>
-
-            {/* ── Monir orb hero ── */}
-            <div className="orb-hero">
-              <div className="allah-calli" aria-hidden="true">ٱللَّٰه</div>
-              <button
-                className="monir-orb"
-                onClick={() => setScreen("chat")}
-                aria-label="باز کردن منیر"
-              >
-                <div className="monir-orb-core">✦</div>
-              </button>
-            </div>
-
-            {/* ── Mosque cards ── */}
-            <div className="mosque-section">
-              <div className="mosque-pair">
-                {[
-                  { emoji: "🕌", name: "مسجد الحرام", city: "مکه مکرمه" },
-                  { emoji: "🕌", name: "مسجد النبی", city: "مدینه منوره" },
-                ].map((m, i) => (
-                  <button key={i} className="mosque-card">
-                    <span className="mosque-icon">{m.emoji}</span>
-                    <span className="mosque-name">{m.name}</span>
-                    <span className="mosque-city">{m.city}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Feed — only rendered when posts exist or loading ── */}
-            {(loadingFeed || posts.length > 0) && (
-              <ErrorBoundary fallback={
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", color: "rgba(212,160,23,0.50)", fontSize: "13px", fontFamily: "Vazirmatn, sans-serif", direction: "rtl" }}>
-                  <span style={{ fontSize: "26px" }}>⚠</span>
-                  <span>خطا در بارگذاری پست‌ها</span>
-                </div>
-              }>
-                <PostFeed
-                  posts={posts}
-                  userId={userId}
-                  loadingFeed={loadingFeed}
-                  loadingMore={loadingMore}
-                  nextCursor={nextCursor}
-                  onLoadMore={() => loadFeed(nextCursor ?? undefined)}
-                  onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
-                />
-              </ErrorBoundary>
-            )}
-
-            <ErrorBoundary silent>
-              <BottomNav activeTab={activeTab} onTab={handleTab} />
-            </ErrorBoundary>
-          </div>
+          <HomeScreen
+            activeTab={activeTab}
+            onTab={handleTab}
+            userId={userId}
+            posts={posts}
+            nextCursor={nextCursor}
+            loadingFeed={loadingFeed}
+            loadingMore={loadingMore}
+            onLoadMore={() => loadFeed(nextCursor ?? undefined)}
+            onNewPost={() => userId ? setShowNew(true) : router.push("/login")}
+            onOpenChat={() => setScreen("chat")}
+          />
         )}
 
         {/* ══ CHAT SCREEN ══ */}
