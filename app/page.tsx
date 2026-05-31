@@ -257,21 +257,14 @@ export default function App() {
   /* ── Render ──────────────────────────────────────── */
   return (
     <>
-      {/* NASA galaxy video — loops silently, covers full screen */}
+      {/* NASA Hubble Ultra Deep Field — Ken Burns slow zoom, living galaxy feel */}
       <div className="bg">
-        <video
-          className="galaxy-video"
-          autoPlay
-          loop
-          muted
-          playsInline
+        <img
+          className="hubble-img"
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Hubble_ultra_deep_field.jpg/1280px-Hubble_ultra_deep_field.jpg"
+          alt=""
           aria-hidden="true"
-        >
-          {/* NASA SVS — Hubble eXtreme Deep Field fly-through (public domain) */}
-          <source src="https://svs.gsfc.nasa.gov/vis/a000000/a004200/a004234/HubbleXDF_web.mp4" type="video/mp4" />
-          {/* Pixabay CC-0 space fallback if NASA CDN is unavailable */}
-          <source src="https://cdn.pixabay.com/video/2016/09/01/4906-181579791_large.mp4" type="video/mp4" />
-        </video>
+        />
       </div>
 
       <div className="app">
@@ -440,16 +433,25 @@ export default function App() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; background: #020a1a; overflow: hidden; }
 
-        /* ── Galaxy video background ── */
+        /* ── Hubble image background with Ken Burns effect ── */
         .bg {
           position: fixed; inset: 0; z-index: 0;
           overflow: hidden;
-          background: #020a1a; /* fallback colour if video fails */
+          background: #020a1a;
         }
-        .galaxy-video {
+        .hubble-img {
           position: absolute; inset: 0;
           width: 100%; height: 100%;
           object-fit: cover; pointer-events: none;
+          transform-origin: center center;
+          animation: kenBurns 30s ease-in-out infinite alternate;
+        }
+        @keyframes kenBurns {
+          0%   { transform: scale(1)    translate(0%,    0%);    }
+          25%  { transform: scale(1.06) translate(-1.5%, 0.5%);  }
+          50%  { transform: scale(1.10) translate(-2.5%, -1%);   }
+          75%  { transform: scale(1.06) translate(1%,    -1.5%); }
+          100% { transform: scale(1)    translate(0%,    0%);    }
         }
         .bg::after {
           content: ''; position: absolute; inset: 0; z-index: 1;
@@ -1500,25 +1502,27 @@ export default function App() {
           flex-shrink: 0;
         }
 
-        /* Allah calligraphy — large golden glyph behind the orb */
+        /* Allah calligraphy — Thuluth-style sacred glyph behind the orb */
         .allah-calli {
           position: absolute;
-          font-size: 200px;
-          font-family: 'Vazirmatn', sans-serif;
+          font-size: 220px;
+          font-family: 'Scheherazade New', 'Vazirmatn', serif;
           font-weight: 700;
-          color: #d4a017;
-          opacity: 0.13;
+          background: linear-gradient(160deg, #f5d060 0%, #D4A017 45%, #b8860b 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          opacity: 0.25;
           user-select: none;
           pointer-events: none;
-          letter-spacing: -0.02em;
+          letter-spacing: -0.01em;
           line-height: 1;
-          filter: blur(0.3px);
-          text-shadow:
-            0 0  18px rgba(212,160,23,1.00),
-            0 0  45px rgba(212,160,23,0.90),
-            0 0  90px rgba(212,160,23,0.70),
-            0 0 180px rgba(212,160,23,0.45),
-            0 0 340px rgba(212,160,23,0.22);
+          filter:
+            drop-shadow(0 0 12px rgba(212,160,23,1.00))
+            drop-shadow(0 0 28px rgba(212,160,23,0.90))
+            drop-shadow(0 0 55px rgba(212,160,23,0.75))
+            drop-shadow(0 0 110px rgba(212,160,23,0.50))
+            drop-shadow(0 0 220px rgba(212,160,23,0.28));
           z-index: 0;
         }
 
