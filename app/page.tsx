@@ -257,15 +257,7 @@ export default function App() {
   /* ── Render ──────────────────────────────────────── */
   return (
     <>
-      {/* NASA Hubble Ultra Deep Field — Ken Burns slow zoom, living galaxy feel */}
-      <div className="bg">
-        <img
-          className="hubble-img"
-          src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Hubble_ultra_deep_field.jpg/1280px-Hubble_ultra_deep_field.jpg"
-          alt=""
-          aria-hidden="true"
-        />
-      </div>
+      <div className="bg"></div>
 
       <div className="app">
 
@@ -433,11 +425,10 @@ export default function App() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; background: #020a1a; overflow: hidden; }
 
-        /* ── Hubble image background with Ken Burns effect ── */
         .bg {
           position: fixed; inset: 0; z-index: 0;
           overflow: hidden;
-          background: #020a1a;
+          background: radial-gradient(ellipse at 20% 50%, #1a0533 0%, #000510 40%, #000205 100%);
         }
         .hubble-img {
           position: absolute; inset: 0;
@@ -1502,27 +1493,25 @@ export default function App() {
           flex-shrink: 0;
         }
 
+        @keyframes allahGlow {
+          0%, 100% { opacity: 0.15; }
+          50%       { opacity: 0.28; }
+        }
+
         /* Allah calligraphy — Thuluth-style sacred glyph behind the orb */
         .allah-calli {
           position: absolute;
-          font-size: 220px;
-          font-family: 'Scheherazade New', 'Vazirmatn', serif;
-          font-weight: 700;
-          background: linear-gradient(160deg, #f5d060 0%, #D4A017 45%, #b8860b 100%);
+          font-family: "Scheherazade New", serif;
+          font-size: 18vw;
+          color: transparent;
+          background: linear-gradient(135deg, #D4A017, #F5D060, #B8860B);
           -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
           background-clip: text;
-          opacity: 0.25;
-          user-select: none;
+          animation: allahGlow 4s ease-in-out infinite;
+          filter: drop-shadow(0 0 40px rgba(212,160,23,0.4));
+          opacity: 0.22;
           pointer-events: none;
-          letter-spacing: -0.01em;
-          line-height: 1;
-          filter:
-            drop-shadow(0 0 12px rgba(212,160,23,1.00))
-            drop-shadow(0 0 28px rgba(212,160,23,0.90))
-            drop-shadow(0 0 55px rgba(212,160,23,0.75))
-            drop-shadow(0 0 110px rgba(212,160,23,0.50))
-            drop-shadow(0 0 220px rgba(212,160,23,0.28));
+          user-select: none;
           z-index: 0;
         }
 
