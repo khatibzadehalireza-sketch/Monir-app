@@ -32,7 +32,12 @@
       "Bash(Select-Object Name, Mode)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Gebruiker\\\\monir-app\" -Force | Select-Object Name, @{n='Type';e={if\\($_.PSIsContainer\\){'Dir'}else{'File'}}})",
       "Bash(npx next *)",
-      "Bash(vercel *)"
+      "Bash(vercel *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Gebruiker\\\\monir-app\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-List FullName)",
+      "WebFetch(domain:mixkit.co)",
+      "Bash(powershell -Command \"Start-Process -FilePath 'npx' -ArgumentList 'next','dev','--port','3131' -RedirectStandardOutput 'C:\\\\Users\\\\Gebruiker\\\\monir-app\\\\next-dev.log' -RedirectStandardError 'C:\\\\Users\\\\Gebruiker\\\\monir-app\\\\next-dev-err.log' -WindowStyle Hidden -WorkingDirectory 'C:\\\\Users\\\\Gebruiker\\\\monir-app'\")"
     ]
   }
 }
