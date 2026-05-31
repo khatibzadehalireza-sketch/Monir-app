@@ -429,6 +429,7 @@ export default function App() {
           position: fixed; inset: 0; z-index: 0;
           overflow: hidden;
           background: radial-gradient(ellipse at 20% 50%, #1a0533 0%, #000510 40%, #000205 100%);
+          background-image: radial-gradient(ellipse at 20% 50%, #1a0533 0%, #000510 40%, #000205 100%);
         }
         .hubble-img {
           position: absolute; inset: 0;
@@ -1502,14 +1503,14 @@ export default function App() {
         .allah-calli {
           position: absolute;
           font-family: "Scheherazade New", serif;
-          font-size: 18vw;
+          font-size: 55vw;
           color: transparent;
           background: linear-gradient(135deg, #D4A017, #F5D060, #B8860B);
           -webkit-background-clip: text;
           background-clip: text;
           animation: allahGlow 4s ease-in-out infinite;
           filter: drop-shadow(0 0 40px rgba(212,160,23,0.4));
-          opacity: 0.22;
+          opacity: 0.12;
           pointer-events: none;
           user-select: none;
           z-index: 0;
