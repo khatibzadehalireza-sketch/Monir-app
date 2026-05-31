@@ -280,6 +280,26 @@ export default function App() {
               </button>
             </div>
 
+            {/* ── Mosque cards ── */}
+            <div className="mosque-section">
+              <div className="mosque-scroll">
+                {[
+                  { emoji: "🕌", name: "مسجد الحرام", city: "مکه مکرمه" },
+                  { emoji: "🕌", name: "مسجد النبی", city: "مدینه منوره" },
+                  { emoji: "🕌", name: "مسجد قدس", city: "بیت‌المقدس" },
+                  { emoji: "🕌", name: "مسجد جامع اصفهان", city: "اصفهان" },
+                  { emoji: "🕌", name: "مسجد گوهرشاد", city: "مشهد" },
+                  { emoji: "🕌", name: "مسجد بلو", city: "استانبول" },
+                ].map((m, i) => (
+                  <button key={i} className="mosque-card">
+                    <span className="mosque-icon">{m.emoji}</span>
+                    <span className="mosque-name">{m.name}</span>
+                    <span className="mosque-city">{m.city}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* ── Feed — only rendered when posts exist or loading ── */}
             {(loadingFeed || posts.length > 0) && (
               <ErrorBoundary fallback={
@@ -1580,6 +1600,57 @@ export default function App() {
         .live-screen-body {
           flex: 1; overflow-y: auto; min-height: 0;
           padding: 20px 0;
+        }
+
+        /* ════════════════════════════════════════════
+           MOSQUE CARDS
+        ════════════════════════════════════════════ */
+        .mosque-section {
+          flex-shrink: 0;
+          padding: 4px 0 10px;
+        }
+        .mosque-scroll {
+          display: flex; gap: 10px;
+          padding: 0 16px;
+          overflow-x: auto; scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        .mosque-scroll::-webkit-scrollbar { display: none; }
+
+        .mosque-card {
+          flex-shrink: 0;
+          display: flex; flex-direction: column; align-items: center; gap: 5px;
+          padding: 10px 14px;
+          background: rgba(7,11,27,0.82);
+          border: 1px solid rgba(212,160,23,0.16);
+          border-radius: 16px;
+          backdrop-filter: blur(18px);
+          cursor: pointer;
+          transition: all .22s;
+          font-family: 'Vazirmatn', sans-serif;
+          min-width: 90px;
+        }
+        .mosque-card:hover {
+          border-color: rgba(212,160,23,0.40);
+          background: rgba(212,160,23,0.08);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 24px rgba(0,0,0,0.40), 0 0 18px rgba(212,160,23,0.10);
+        }
+        .mosque-card:active { transform: scale(0.95); }
+
+        .mosque-icon {
+          font-size: 22px; line-height: 1;
+          filter: drop-shadow(0 0 6px rgba(212,160,23,0.30));
+        }
+        .mosque-name {
+          font-size: 11px; font-weight: 700;
+          color: rgba(232,215,160,0.88);
+          white-space: nowrap; direction: rtl;
+        }
+        .mosque-city {
+          font-size: 9.5px; font-weight: 400;
+          color: rgba(212,160,23,0.45);
+          white-space: nowrap; direction: rtl;
         }
       `}</style>
     </>
