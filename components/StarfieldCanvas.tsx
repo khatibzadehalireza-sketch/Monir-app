@@ -65,10 +65,11 @@ export function StarfieldCanvas() {
         return { geo, pts, pos, count, speed };
       }
 
+      const mobile = innerWidth < 600;
       const layers: Layer[] = [
-        makeLayer(2200, 0.45, 0.50, 0.08),  // distant, slow
-        makeLayer(700,  1.00, 0.72, 0.20),  // mid
-        makeLayer(180,  2.20, 0.92, 0.42),  // close, fast, bright
+        makeLayer(mobile ? 500  : 2200, 0.45, 0.50, 0.08),  // distant, slow
+        makeLayer(mobile ? 160  : 700,  1.00, 0.72, 0.20),  // mid
+        makeLayer(mobile ? 45   : 180,  2.20, 0.92, 0.42),  // close, fast, bright
       ];
 
       /* ── Parallax state ───────────────────────────── */
