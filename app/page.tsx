@@ -244,10 +244,6 @@ export default function App() {
 
   const handleTab = useCallback((tab: Tab) => {
     setActiveTab(tab);
-    if (tab === "live")      { localStorage.setItem("monir_auto_msg", "مکه");    setScreen("chat"); return; }
-    if (tab === "help")      { setScreen("chat");      return; }
-    if (tab === "prayer")    { localStorage.setItem("monir_auto_msg", "نماز");   setScreen("chat"); return; }
-    if (tab === "notebook")  { localStorage.setItem("monir_auto_msg", "دفترچه"); setScreen("chat"); return; }
     if (tab === "quran")     { localStorage.setItem("monir_auto_msg", "قرآن");   setScreen("chat"); return; }
     if (tab === "community") { localStorage.setItem("monir_auto_msg", "فید");    setScreen("chat"); return; }
     setScreen("home");
