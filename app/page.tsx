@@ -290,7 +290,7 @@ export default function App() {
             </div>
           }>
             <ChatScreen
-              onBack={() => { setScreen("home"); setActiveTab("community"); }}
+              onBack={() => { setScreen("home"); setActiveTab("quran"); }}
               userName={userName}
               onOpenPost={() => userId ? setShowNew(true) : router.push("/login")}
             />
@@ -303,7 +303,7 @@ export default function App() {
             <div className="live-screen-hdr">
               <button
                 className="ibtn"
-                onClick={() => { setScreen("home"); setActiveTab("community"); }}
+                onClick={() => { setScreen("home"); setActiveTab("quran"); }}
                 aria-label="بازگشت"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
