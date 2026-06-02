@@ -180,17 +180,6 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
     }
   }, [isReciting]);
 
-  const sendRef = useRef(send);
-  useEffect(() => { sendRef.current = send; }, [send]);
-
-  useEffect(() => {
-    const msg = localStorage.getItem("monir_auto_msg");
-    if (!msg) return;
-    localStorage.removeItem("monir_auto_msg");
-    const t = setTimeout(() => sendRef.current(msg), 1000);
-    return () => clearTimeout(t);
-  }, []);
-
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     e.target.style.height = "auto";
@@ -268,6 +257,17 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
       setMessages(p => [...p, { role: "assistant", content: "فرزندم... ارتباط قطع شد.", id: Date.now().toString() }]);
     } finally { setIsLoading(false); }
   }, [input, isLoading, messages, userName, onOpenPost, router]);
+
+  const sendRef = useRef(send);
+  useEffect(() => { sendRef.current = send; }, [send]);
+
+  useEffect(() => {
+    const msg = localStorage.getItem("monir_auto_msg");
+    if (!msg) return;
+    localStorage.removeItem("monir_auto_msg");
+    const t = setTimeout(() => sendRef.current(msg), 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   const onKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
