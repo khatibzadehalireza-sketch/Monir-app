@@ -98,6 +98,7 @@ export function HomeScreen({
 
   return (
     <div className="screen home">
+      <div aria-hidden="true" style={{ position: "absolute", top: "5%", left: "50%", transform: "translateX(-50%)", fontFamily: "'Scheherazade New', serif", fontSize: "2.5rem", background: "linear-gradient(135deg, #D4A017, #F5D060, #B8860B)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", zIndex: 10, pointerEvents: "none", userSelect: "none" }}>ﷲ</div>
       <ErrorBoundary silent>
         <Header />
       </ErrorBoundary>
