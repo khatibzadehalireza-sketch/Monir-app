@@ -63,11 +63,26 @@ export function HomeScreen({
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     if (localStorage.getItem("dua-played-date") === today) return;
-    const audio = new Audio("https://cdn.islamicfinder.org/audio/ya-muqallib.mp3");
-    audio.volume = 0.6;
-    audio.play().then(() => {
-      localStorage.setItem("dua-played-date", today);
-    }).catch(() => {});
+
+    let played = false;
+    const play = () => {
+      if (played) return;
+      played = true;
+      document.removeEventListener('click', play);
+      document.removeEventListener('touchstart', play);
+      const audio = new Audio("https://cdn.islamicfinder.org/audio/ya-muqallib.mp3");
+      audio.volume = 0.6;
+      audio.play().then(() => {
+        localStorage.setItem("dua-played-date", today);
+      }).catch(() => {});
+    };
+
+    document.addEventListener('click', play);
+    document.addEventListener('touchstart', play);
+    return () => {
+      document.removeEventListener('click', play);
+      document.removeEventListener('touchstart', play);
+    };
   }, []);
 
   const submit = useCallback(() => {
