@@ -4,6 +4,15 @@ import { GoogleGenerativeAI, TaskType } from '@google/generative-ai';
 import { getSupabase } from '@/lib/supabase';
 import { extractEmotionScores } from '@/lib/extractEmotions';
 
+const WESTERN_COUNTRIES     = new Set(['NL','DE','FR','GB','BE','IT','ES','SE','NO','DK','AT','CH','US','CA','AU','NZ']);
+const TRADITIONAL_COUNTRIES = new Set(['TR','PK','BD','ID','SA','AE','EG','MA','NG','IR','IQ','SY','JO','KW','QA','BH','OM','TN','DZ','LY','SN','ML','GH','ET','SO','YE','AF','UZ','KZ','TJ','AZ']);
+
+function getCountryTone(code: string | null): 'western' | 'traditional' | null {
+  if (!code) return null;
+  if (WESTERN_COUNTRIES.has(code))     return 'western';
+  if (TRADITIONAL_COUNTRIES.has(code)) return 'traditional';
+  return null;
+}
 
 // ─── Safety Layer ───────────────────────────────
 // این بخش قبل از هر چیز چک می‌کنه کاربر در بحران هست یا نه
@@ -820,7 +829,13 @@ export async function POST(request: NextRequest) {
       (timezone ? ` | منطقه زمانی کاربر: ${timezone}` : '') +
       `】\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + freshStartNote + dateContext + SYSTEM_PROMPT;
+    const countryTone = getCountryTone(request.headers.get('x-vercel-ip-country'));
+    const countryToneNote = countryTone === 'western'
+      ? '\nلحن تو شاعرانه، عمیق و عارفانه باشد. از شعر و استعاره استفاده کن.'
+      : countryTone === 'traditional'
+      ? '\nلحن تو صمیمی، مستقیم و کلاسیک اسلامی باشد.'
+      : '';
+    const systemFinal   = buildProfileContext(currentProfile) + prayerContext + nameHint + checkinInjection + subtleHint + intentNote + freshStartNote + dateContext + SYSTEM_PROMPT + countryToneNote;
 
     const repairedMessage = repairShortQuery(message, history);
     const groqMessages = [
