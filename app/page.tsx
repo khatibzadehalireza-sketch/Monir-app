@@ -246,7 +246,7 @@ export default function App() {
     setActiveTab(tab);
     if (tab === "live")     { setScreen("live");      return; }
     if (tab === "help")     { setScreen("chat");      return; }
-    if (tab === "prayer")   { router.push("/prayer"); return; }
+    if (tab === "prayer")   { localStorage.setItem("monir_auto_msg", "نماز"); setScreen("chat"); return; }
     if (tab === "notebook") { router.push("/memory"); return; }
     if (tab === "quran")    { router.push("/quran");  return; }
     setScreen("home");

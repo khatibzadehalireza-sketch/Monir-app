@@ -180,6 +180,17 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
     }
   }, [isReciting]);
 
+  const sendRef = useRef(send);
+  useEffect(() => { sendRef.current = send; }, [send]);
+
+  useEffect(() => {
+    const msg = localStorage.getItem("monir_auto_msg");
+    if (!msg) return;
+    localStorage.removeItem("monir_auto_msg");
+    const t = setTimeout(() => sendRef.current(msg), 1000);
+    return () => clearTimeout(t);
+  }, []);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     e.target.style.height = "auto";
@@ -198,13 +209,15 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
     } catch { /* silent */ }
   }, []);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
+  const send = useCallback(async (msgOverride?: string) => {
+    const text = msgOverride ?? input.trim();
     if (!text || isLoading) return;
     const userMsg: Message = { role: "user", content: text, id: Date.now().toString() };
     setMessages(p => [...p, userMsg]);
-    setInput("");
-    if (taRef.current) taRef.current.style.height = "auto";
+    if (!msgOverride) {
+      setInput("");
+      if (taRef.current) taRef.current.style.height = "auto";
+    }
 
     const intent = detectChatIntent(text);
     if (intent) {
