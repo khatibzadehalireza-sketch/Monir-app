@@ -1,6 +1,6 @@
 "use client";
 
-export type Tab = "monir" | "quran" | "prayer" | "notebook" | "community" | "help" | "live";
+export type Tab = "quran" | "azan" | "qibla";
 
 interface Props {
   activeTab: Tab;
@@ -75,13 +75,16 @@ function BroadcastIcon() {
 }
 
 const TABS = [
-  { id: "monir"     as Tab, icon: <CrescentIcon />,   label: "منیر" },
-  { id: "quran"     as Tab, icon: <BookIcon />,        label: "قرآن" },
-  { id: "prayer"    as Tab, icon: <DuaHandsIcon />,    label: "عبادت" },
-  { id: "notebook"  as Tab, icon: <NotebookIcon />,    label: "دفترچه" },
-  { id: "community" as Tab, icon: <CommunityIcon />,   label: "اجتماع" },
-  { id: "help"      as Tab, icon: <HeartIcon />,       label: "کمک" },
-  { id: "live"      as Tab, icon: <BroadcastIcon />,   label: "زنده" },
+  { id: "quran" as Tab, icon: <BookIcon />,     label: "قرآن" },
+  { id: "azan"  as Tab, icon: <DuaHandsIcon />, label: "اذان" },
+  { id: "qibla" as Tab, icon: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polygon points="12 2 14.5 9.5 12 8 9.5 9.5 12 2" fill="currentColor" stroke="none"/>
+      <polygon points="12 22 9.5 14.5 12 16 14.5 14.5 12 22" fill="currentColor" opacity="0.4" stroke="none"/>
+      <line x1="12" y1="8" x2="12" y2="16"/>
+    </svg>
+  ), label: "قبله" },
 ];
 
 export function BottomNav({ activeTab, onTab }: Props) {
