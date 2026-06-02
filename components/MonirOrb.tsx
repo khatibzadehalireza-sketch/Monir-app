@@ -7,8 +7,7 @@ interface Props {
 export function MonirOrb({ onClick }: Props) {
   return (
     <div className="orb-hero">
-      <div className="allah-calli" aria-hidden="true">ٱللَّٰه</div>
-      <button
+<button
         className="monir-orb"
         onClick={onClick}
         aria-label="باز کردن منیر"
