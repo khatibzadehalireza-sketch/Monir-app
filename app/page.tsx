@@ -560,8 +560,11 @@ export default function App() {
         }
         .allah-calli {
           position: absolute;
+          top: 2%;
+          left: 50%;
+          transform: translateX(-50%);
           font-family: "Scheherazade New", serif;
-          font-size: 55vw;
+          font-size: 8vw;
           color: transparent;
           background: linear-gradient(135deg, #D4A017, #F5D060, #B8860B);
           -webkit-background-clip: text;
