@@ -1317,7 +1317,7 @@ export async function POST(request: NextRequest) {
       }).then(({ error }) => { if (error) console.error('[safety_risk insert]', error.message); });
     }
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, uiComponent: isPrayerTimeQuery ? 'prayer' : undefined });
 
   } catch (error) {
     console.error('خطا:', error);

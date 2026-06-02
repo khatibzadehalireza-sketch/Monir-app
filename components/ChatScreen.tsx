@@ -247,7 +247,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
         }),
       });
       const data = await res.json();
-      setMessages(p => [...p, { role: "assistant", content: data.reply, id: Date.now().toString() }]);
+      setMessages(p => [...p, { role: "assistant", content: data.reply, id: Date.now().toString(), widget: data.uiComponent }]);
       if (msgCount.current >= 5 && !feedbackShownRef.current) {
         feedbackShownRef.current = true; setShowFeedback(true);
       }
