@@ -60,6 +60,16 @@ export function HomeScreen({
     }
   }, []);
 
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem("dua-played-date") === today) return;
+    const audio = new Audio("https://cdn.islamicfinder.org/audio/ya-muqallib.mp3");
+    audio.volume = 0.6;
+    audio.play().then(() => {
+      localStorage.setItem("dua-played-date", today);
+    }).catch(() => {});
+  }, []);
+
   const submit = useCallback(() => {
     const text = input.trim();
     if (!text) return;
@@ -78,8 +88,6 @@ export function HomeScreen({
       </ErrorBoundary>
 
       <div className="home-body">
-        <p className="home-dua">يَا مُقَلِّبَ الْقُلُوبِ</p>
-
         <MonirOrb onClick={onOpenChat} />
 
         <p className="home-subtitle">امروز چه در دلت داری؟</p>
