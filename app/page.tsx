@@ -560,7 +560,7 @@ export default function App() {
         }
         .allah-calli {
           position: absolute;
-          top: 2%;
+          top: 8%;
           left: 50%;
           transform: translateX(-50%);
           font-family: "Scheherazade New", serif;
