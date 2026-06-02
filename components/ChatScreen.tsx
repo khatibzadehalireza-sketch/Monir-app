@@ -346,7 +346,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
             onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
             placeholder="هر چه در دل داری بگو..." rows={1} className="ta"
           />
-          <button onClick={send} disabled={!input.trim() || isLoading}
+          <button onClick={() => send()} disabled={!input.trim() || isLoading}
             className={`sbtn${input.trim() && !isLoading ? " sbtn-on" : ""}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/>
