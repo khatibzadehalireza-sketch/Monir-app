@@ -134,7 +134,7 @@ function NewPostModal({
 /* ─── Main App ────────────────────────────────────── */
 export default function App() {
   const [screen,    setScreen]    = useState<"home" | "chat" | "live">("home");
-  const [activeTab, setActiveTab] = useState<Tab>("monir");
+  const [activeTab, setActiveTab] = useState<Tab>("quran");
 
   /* auth */
   const [userId,     setUserId]     = useState<string | null>(null);
