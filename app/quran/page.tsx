@@ -176,6 +176,7 @@ export default function QuranPage() {
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; background: #020810; overflow: hidden; }
+        body { overflow-y: auto !important; }
 
         .bg {
           position: fixed; inset: 0; z-index: 0;
@@ -233,7 +234,7 @@ export default function QuranPage() {
         /* ── scroll container ── */
         .scroll {
           flex: 1;
-          overflow-y: auto;
+          overflow-y: scroll;
           -webkit-overflow-scrolling: touch;
           min-height: 0;
           padding: 14px 14px;
