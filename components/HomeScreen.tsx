@@ -26,11 +26,26 @@ const PRAYER_FA: Record<string, string> = {
   Fajr: 'فجر', Dhuhr: 'ظهر', Asr: 'عصر', Maghrib: 'مغرب', Isha: 'عشا',
 };
 
+function toPersian(n: number): string {
+  return String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[+d]);
+}
+
+function formatCountdown(name: string, secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  const fa = PRAYER_FA[name] || name;
+  if (h > 0) return `${toPersian(h)} ساعت ${toPersian(m)} دقیقه تا ${fa}`;
+  if (m > 0) return `${toPersian(m)} دقیقه ${toPersian(s)} ثانیه تا ${fa}`;
+  return `${toPersian(s)} ثانیه تا ${fa}`;
+}
+
 export function HomeScreen({
   activeTab, onTab, onOpenChat,
 }: Props) {
-  const [input,      setInput]      = useState("");
-  const [nextPrayer, setNextPrayer] = useState<{ name: string; time: string } | null>(null);
+  const [input,         setInput]         = useState("");
+  const [prayerTimings, setPrayerTimings] = useState<Record<string, string> | null>(null);
+  const [countdown,     setCountdown]     = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -40,12 +55,9 @@ export function HomeScreen({
         .then(d => {
           const t = d?.data?.timings;
           if (!t) return;
-          const now = new Date().getHours() * 60 + new Date().getMinutes();
-          for (const p of PRAYER_ORDER) {
-            const [h, m] = (t[p] || '').split(':').map(Number);
-            if (h * 60 + m > now) { setNextPrayer({ name: p, time: t[p] }); return; }
-          }
-          setNextPrayer({ name: 'Fajr', time: t['Fajr'] });
+          const timings: Record<string, string> = {};
+          for (const p of PRAYER_ORDER) timings[p] = t[p] || '';
+          setPrayerTimings(timings);
         })
         .catch(() => {});
 
@@ -59,6 +71,24 @@ export function HomeScreen({
       load(52.3676, 4.9041);
     }
   }, []);
+
+  useEffect(() => {
+    if (!prayerTimings) return;
+    const tick = () => {
+      const now = new Date();
+      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      for (const p of PRAYER_ORDER) {
+        const [h, m] = (prayerTimings[p] || '').split(':').map(Number);
+        const pSec = h * 3600 + m * 60;
+        if (pSec > nowSec) { setCountdown(formatCountdown(p, pSec - nowSec)); return; }
+      }
+      const [fh, fm] = (prayerTimings['Fajr'] || '').split(':').map(Number);
+      setCountdown(formatCountdown('Fajr', 86400 - nowSec + fh * 3600 + fm * 60));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [prayerTimings]);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -134,9 +164,16 @@ export function HomeScreen({
           </button>
         </div>
 
-        {nextPrayer && (
+        {countdown && (
           <p className="home-prayer">
-            {PRAYER_FA[nextPrayer.name]} · {nextPrayer.time}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',verticalAlign:'middle',marginInlineEnd:'6px'}}>
+              <circle cx="18" cy="5" r="2.5"/>
+              <path d="M18 8 L18 13 L7 13"/>
+              <path d="M7 13 L7 10.5"/>
+              <path d="M15 13 L15 21"/>
+              <path d="M18 13 L20 21"/>
+            </svg>
+            {countdown}
           </p>
         )}
       </div>
