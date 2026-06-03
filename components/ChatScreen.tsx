@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 import { TasbihWidget } from "@/components/TasbihWidget";
+import { AdhkarWidget } from "@/components/AdhkarWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
@@ -143,6 +144,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
   const [focused,           setFocused]           = useState(false);
   const [showFeedback,      setShowFeedback]      = useState(false);
   const [showTasbih,        setShowTasbih]        = useState(false);
+  const [showAdhkar,        setShowAdhkar]        = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const endRef           = useRef<HTMLDivElement>(null);
@@ -321,6 +323,11 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
                 📿 باز کردن تسبیح دیجیتال
               </button>
             )}
+            {m.widget === 'adhkar'  && (
+              <button className="wgt-tasbih-btn" onClick={() => setShowAdhkar(true)}>
+                🌙 باز کردن اذکار
+              </button>
+            )}
           </Fragment>
         ))}
         {isLoading && (
@@ -367,6 +374,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
       </div>
 
       {showTasbih && <TasbihWidget onClose={() => setShowTasbih(false)} />}
+      {showAdhkar && <AdhkarWidget onClose={() => setShowAdhkar(false)} />}
     </div>
   );
 }
