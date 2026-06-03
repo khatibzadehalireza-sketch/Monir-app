@@ -192,9 +192,9 @@ export default function QuranPage() {
         }
 
         .app {
-          position: relative; z-index: 1;
-          height: 100vh; height: 100dvh;
-          display: flex; flex-direction: column; overflow: hidden;
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          z-index: 1; overflow: hidden;
+          display: flex; flex-direction: column;
           font-family: 'Vazirmatn', sans-serif; direction: rtl; color: #e8dfc8;
         }
 
