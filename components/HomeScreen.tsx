@@ -165,16 +165,7 @@ export function HomeScreen({
         </div>
 
         {countdown && (
-          <p className="home-prayer">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',verticalAlign:'middle',marginInlineEnd:'6px'}}>
-              <circle cx="18" cy="5" r="2.5"/>
-              <path d="M18 8 L18 13 L7 13"/>
-              <path d="M7 13 L7 10.5"/>
-              <path d="M15 13 L15 21"/>
-              <path d="M18 13 L20 21"/>
-            </svg>
-            {countdown}
-          </p>
+          <p className="home-prayer">{countdown}</p>
         )}
       </div>
 
