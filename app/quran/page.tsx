@@ -79,7 +79,7 @@ export default function QuranPage() {
     <>
       <div className="bg"/>
 
-      <div className="app">
+      <div style={{position:'relative', width:'100%'}}>
 
         {/* ── Header ── */}
         <header className="hdr">
@@ -111,7 +111,7 @@ export default function QuranPage() {
 
         {/* ── Surah list ── */}
         {!activeSurah && (
-          <div className="scroll">
+          <div style={{height:'calc(100vh - 60px)', overflowY:'auto', WebkitOverflowScrolling:'touch' as 'auto', padding:'14px'}}>
             {loadingSurahs && (
               <div className="loading-wrap">
                 <div className="spinner"/>
@@ -147,7 +147,7 @@ export default function QuranPage() {
 
         {/* ── Ayah reader ── */}
         {activeSurah && (
-          <div className="scroll">
+          <div style={{height:'calc(100vh - 60px)', overflowY:'auto', WebkitOverflowScrolling:'touch' as 'auto', padding:'14px'}}>
             {loadingAyahs && (
               <div className="loading-wrap">
                 <div className="spinner"/>
