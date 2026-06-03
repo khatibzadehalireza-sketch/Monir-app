@@ -192,9 +192,10 @@ export default function QuranPage() {
         }
 
         .app {
-          position: relative; z-index: 1; height: 100dvh;
-          font-family: 'Vazirmatn', sans-serif; direction: rtl; color: #e8dfc8;
+          position: relative; z-index: 1;
+          height: 100vh; height: 100dvh;
           display: flex; flex-direction: column; overflow: hidden;
+          font-family: 'Vazirmatn', sans-serif; direction: rtl; color: #e8dfc8;
         }
 
         /* ── header ── */
@@ -231,10 +232,10 @@ export default function QuranPage() {
 
         /* ── scroll container ── */
         .scroll {
-          flex: 1 1 0;
-          height: 0;
+          flex: 1;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
+          min-height: 0;
           padding: 14px 14px;
           display: flex; flex-direction: column; gap: 0;
         }
