@@ -3,19 +3,21 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
+import { TasbihWidget } from "@/components/TasbihWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
 const QURAN_STREAM = "https://cdn.islamic.network/quran/audio-surah/128/ar.alafasy/55.mp3";
 
-type ChatIntent = 'story' | 'post' | 'prayer' | 'qibla' | 'profile';
+type ChatIntent = 'story' | 'post' | 'prayer' | 'qibla' | 'profile' | 'tasbih';
 
 function detectChatIntent(text: string): ChatIntent | null {
-  if (/استوری/.test(text))       return 'story';
-  if (/پست/.test(text))          return 'post';
-  if (/نماز|اذان/.test(text))    return 'prayer';
-  if (/قبله/.test(text))         return 'qibla';
-  if (/پروفایل/.test(text))      return 'profile';
+  if (/استوری/.test(text))          return 'story';
+  if (/پست/.test(text))             return 'post';
+  if (/نماز|اذان/.test(text))       return 'prayer';
+  if (/قبله/.test(text))            return 'qibla';
+  if (/پروفایل/.test(text))         return 'profile';
+  if (/تسبیح|ذکر|dhikr/i.test(text)) return 'tasbih';
   return null;
 }
 
@@ -25,6 +27,7 @@ const INTENT_REPLIES: Record<ChatIntent, string> = {
   prayer:  'آوردم اوقات شرعی رو برات 🕌',
   qibla:   'آوردم قبله‌نما رو برات 🧭',
   profile: 'داری می‌بری به پروفایل 👤',
+  tasbih:  'تسبیح دیجیتال رو برات آوردم 📿',
 };
 
 /* ── Intent widget helpers ─────────────────────── */
@@ -139,6 +142,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
   const [isLoading,         setIsLoading]         = useState(false);
   const [focused,           setFocused]           = useState(false);
   const [showFeedback,      setShowFeedback]      = useState(false);
+  const [showTasbih,        setShowTasbih]        = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const endRef           = useRef<HTMLDivElement>(null);
@@ -211,8 +215,9 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
     const intent = detectChatIntent(text);
     if (intent) {
       const widgetType: Message["widget"] =
-        intent === 'prayer' ? 'prayer' :
-        intent === 'qibla'  ? 'qibla'  :
+        intent === 'prayer'  ? 'prayer'  :
+        intent === 'qibla'   ? 'qibla'   :
+        intent === 'tasbih'  ? 'tasbih'  :
         (intent === 'story' || intent === 'post') ? 'post' : undefined;
 
       setTimeout(() => setMessages(p => [...p, {
@@ -308,9 +313,14 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
               {m.role === "assistant" && <div className="av"><span>✦</span></div>}
               <div className={`bubble bubble-${m.role}`}>{m.content}</div>
             </div>
-            {m.widget === 'prayer' && <ErrorBoundary silent><PrayerWidget /></ErrorBoundary>}
-            {m.widget === 'qibla'  && <ErrorBoundary silent><QiblaWidget /></ErrorBoundary>}
-            {m.widget === 'post'   && <ErrorBoundary silent><PostWidget onOpen={onOpenPost} /></ErrorBoundary>}
+            {m.widget === 'prayer'  && <ErrorBoundary silent><PrayerWidget /></ErrorBoundary>}
+            {m.widget === 'qibla'   && <ErrorBoundary silent><QiblaWidget /></ErrorBoundary>}
+            {m.widget === 'post'    && <ErrorBoundary silent><PostWidget onOpen={onOpenPost} /></ErrorBoundary>}
+            {m.widget === 'tasbih'  && (
+              <button className="wgt-tasbih-btn" onClick={() => setShowTasbih(true)}>
+                📿 باز کردن تسبیح دیجیتال
+              </button>
+            )}
           </Fragment>
         ))}
         {isLoading && (
@@ -355,6 +365,8 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
           </button>
         </div>
       </div>
+
+      {showTasbih && <TasbihWidget onClose={() => setShowTasbih(false)} />}
     </div>
   );
 }

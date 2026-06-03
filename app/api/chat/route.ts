@@ -748,6 +748,7 @@ export async function POST(request: NextRequest) {
 
     // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی + before scores در parallel ---
     const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
+    const isTasbihQuery     = /تسبیح|ذکر/u.test(message);
     const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult, existingLifeEventsResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
@@ -1317,7 +1318,7 @@ export async function POST(request: NextRequest) {
       }).then(({ error }) => { if (error) console.error('[safety_risk insert]', error.message); });
     }
 
-    return NextResponse.json({ reply, uiComponent: isPrayerTimeQuery ? 'prayer' : undefined });
+    return NextResponse.json({ reply, uiComponent: isPrayerTimeQuery ? 'prayer' : isTasbihQuery ? 'tasbih' : undefined });
 
   } catch (error) {
     console.error('خطا:', error);

@@ -1138,6 +1138,22 @@ export default function App() {
           display: flex; flex-direction: column; gap: 9px;
           direction: rtl;
         }
+        .wgt-tasbih-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          margin-left: 41px; margin-top: 6px;
+          padding: 10px 18px; border-radius: 22px;
+          background: rgba(212,160,23,0.12);
+          border: 1px solid rgba(212,160,23,0.30);
+          color: rgba(212,160,23,0.80);
+          font-family: 'Vazirmatn', sans-serif; font-size: 13px;
+          cursor: pointer; transition: all .18s;
+          animation: pop .30s cubic-bezier(.22,.68,0,1.2) both;
+        }
+        .wgt-tasbih-btn:hover {
+          background: rgba(212,160,23,0.20);
+          color: #d4a017;
+          box-shadow: 0 0 12px rgba(212,160,23,0.22);
+        }
         .wgt-title {
           font-size: 12.5px; font-weight: 700;
           color: rgba(245,208,96,0.88);
