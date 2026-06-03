@@ -231,7 +231,10 @@ export default function QuranPage() {
 
         /* ── scroll container ── */
         .scroll {
-          flex: 1; overflow-y: auto; min-height: 0;
+          flex: 1 1 0;
+          height: 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
           padding: 14px 14px;
           display: flex; flex-direction: column; gap: 0;
         }
