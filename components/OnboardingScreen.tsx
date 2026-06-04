@@ -45,6 +45,13 @@ export function OnboardingScreen({ onComplete }: Props) {
     localStorage.setItem("monir-user-name", name.trim());
     localStorage.setItem("monir-user-need", need);
     localStorage.setItem("monir-onboarding-done", "true");
+    fetch("https://ipapi.co/json/")
+      .then(r => r.json())
+      .then(d => {
+        if (d.country_name) localStorage.setItem("monir-user-country",      d.country_name);
+        if (d.country_code) localStorage.setItem("monir-user-country-code", d.country_code);
+      })
+      .catch(() => {});
     transition("done", onComplete);
   };
 
