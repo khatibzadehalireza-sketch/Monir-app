@@ -6,12 +6,11 @@ interface Props {
   onComplete: () => void;
 }
 
-type Step = 0 | 1 | 2;
+type Step = 0 | 1;
 
 export function OnboardingScreen({ onComplete }: Props) {
   const [step,     setStep]     = useState<Step>(0);
   const [name,     setName]     = useState("");
-  const [location, setLocation] = useState("");
   const [visible,  setVisible]  = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -22,7 +21,7 @@ export function OnboardingScreen({ onComplete }: Props) {
   }, [onComplete]);
 
   useEffect(() => {
-    if (step < 2) setTimeout(() => inputRef.current?.focus(), 380);
+    if (step === 0) setTimeout(() => inputRef.current?.focus(), 380);
   }, [step]);
 
   const transition = useCallback((next: Step | "done", afterDone?: () => void) => {
@@ -42,22 +41,15 @@ export function OnboardingScreen({ onComplete }: Props) {
     transition(1);
   };
 
-  const handleLocationSubmit = () => {
-    if (!location.trim()) return;
-    transition(2);
-  };
-
   const handleNeedSelect = (need: string) => {
-    localStorage.setItem("monir-user-name",     name.trim());
-    localStorage.setItem("monir-user-location", location.trim());
-    localStorage.setItem("monir-user-need",     need);
+    localStorage.setItem("monir-user-name", name.trim());
+    localStorage.setItem("monir-user-need", need);
     localStorage.setItem("monir-onboarding-done", "true");
     transition("done", onComplete);
   };
 
   const monirMessage =
     step === 0 ? "سلام، من منیر هستم. اینجام تا در مسیر خدا همراهت باشم.\nنام شما چیست؟" :
-    step === 1 ? `خوشوقتم ${name.trim()}!\nکجا زندگی می‌کنی؟` :
                  `${name.trim()} عزیز، الان بیشتر\nبه چی نیاز داری؟`;
 
   const needs = [
@@ -93,7 +85,7 @@ export function OnboardingScreen({ onComplete }: Props) {
 
         {/* Step dots */}
         <div className="ob-dots">
-          {([0, 1, 2] as Step[]).map(i => (
+          {([0, 1] as Step[]).map(i => (
             <div key={i} className={`ob-dot${step === i ? " ob-dot-active" : step > i ? " ob-dot-done" : ""}`} />
           ))}
         </div>
@@ -117,27 +109,8 @@ export function OnboardingScreen({ onComplete }: Props) {
           </div>
         )}
 
-        {/* Step 1 — location */}
+        {/* Step 1 — need selection */}
         {step === 1 && (
-          <div className="ob-form">
-            <input
-              ref={inputRef}
-              className="ob-input"
-              placeholder="شهر یا کشورت..."
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleLocationSubmit()}
-              dir="rtl"
-              autoComplete="off"
-            />
-            <button className="ob-next-btn" onClick={handleLocationSubmit} disabled={!location.trim()}>
-              بعدی →
-            </button>
-          </div>
-        )}
-
-        {/* Step 2 — need selection */}
-        {step === 2 && (
           <div className="ob-needs">
             {needs.map(n => (
               <button key={n.label} className="ob-need-btn" onClick={() => handleNeedSelect(n.label)}>
