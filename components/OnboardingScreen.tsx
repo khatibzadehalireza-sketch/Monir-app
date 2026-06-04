@@ -112,7 +112,7 @@ export function OnboardingScreen({ onComplete }: Props) {
 
         {/* Monir speech bubble */}
         <div className="ob-bubble">
-          <p className="ob-msg">{monirMessage}</p>
+          <p className="ob-msg" style={step === 1 && countryLabel ? { fontSize: '16px', whiteSpace: 'nowrap' } : undefined}>{monirMessage}</p>
         </div>
 
         {/* Step dots */}
