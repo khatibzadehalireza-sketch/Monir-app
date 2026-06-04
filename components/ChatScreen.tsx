@@ -250,7 +250,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
           })(),
           sessionStartTime:    sessionStart.current,
           sessionMessageCount: msgCount.current,
-          userName:    userName || undefined,
+          userName:    localStorage.getItem('monir-user-name') || userName || undefined,
           consentGiven: localStorage.getItem("monir_consent_given") === "true" ? true : undefined,
           consentDate:  localStorage.getItem("monir_consent_date") || undefined,
         }),
