@@ -8,10 +8,25 @@ interface Props {
 
 type Step = 0 | 1;
 
+const COUNTRY_LABELS: Record<string, string> = {
+  NL: "هلند سرسبز",
+  DE: "آلمان",
+  FR: "فرانسه",
+  BE: "بلژیک",
+  GB: "انگلستان",
+  US: "آمریکا",
+  CA: "کانادا",
+  AU: "استرالیا",
+  TR: "ترکیه",
+  PK: "پاکستان",
+  IR: "ایران",
+};
+
 export function OnboardingScreen({ onComplete }: Props) {
   const [step,     setStep]     = useState<Step>(0);
-  const [name,     setName]     = useState("");
-  const [visible,  setVisible]  = useState(true);
+  const [name,        setName]        = useState("");
+  const [countryCode, setCountryCode] = useState("");
+  const [visible,     setVisible]     = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -19,6 +34,13 @@ export function OnboardingScreen({ onComplete }: Props) {
       onComplete();
     }
   }, [onComplete]);
+
+  useEffect(() => {
+    fetch("https://ipapi.co/json/")
+      .then(r => r.json())
+      .then(d => { if (d.country_code) setCountryCode(d.country_code); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (step === 0) setTimeout(() => inputRef.current?.focus(), 380);
@@ -55,9 +77,12 @@ export function OnboardingScreen({ onComplete }: Props) {
     transition("done", onComplete);
   };
 
+  const countryLabel = COUNTRY_LABELS[countryCode] ?? "";
   const monirMessage =
     step === 0 ? "سلام، من منیر هستم. اینجام تا در مسیر خدا همراهت باشم.\nنام شما چیست؟" :
-                 `${name.trim()} عزیز، الان بیشتر\nبه چی نیاز داری؟`;
+                 countryLabel
+                   ? `${name.trim()} عزیز، خوش آمدی از ${countryLabel}`
+                   : `${name.trim()} عزیز، الان بیشتر\nبه چی نیاز داری؟`;
 
   const needs = [
     { label: "آرامش و ذکر",      icon: "☮️" },
