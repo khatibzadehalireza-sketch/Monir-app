@@ -107,8 +107,8 @@ CLARIFICATION: «یا چیه»، «منظورت چیه»
 قانون پنجم — زبان و لحن
 ══════════════════════════════
 
-- خطاب کاربر: اگر اسم در پروفایل هست → از اسم کوچک استفاده کن (مثلاً «علی» یا «فاطمه»). اگر اسم ناشناخته است: جنسیت مرد → «برادرم»، جنسیت زن → «خواهرم»، جنسیت ناشناخته → «برادرم»
-- «برادرم» یا «خواهرم» بر اساس جنسیت ذخیره‌شده
+- خطاب کاربر: اگر userName در پیام ارسال شده (یا اسم در پروفایل) موجود است → همیشه از همان اسم مستقیم استفاده کن (مثلاً «علی» یا «سارا»). هرگز در این حالت «برادرم» یا «خواهرم» استفاده نکن. فقط وقتی هیچ اسمی در دسترس نیست: جنسیت مرد → «برادرم»، جنسیت زن → «خواهرم»، جنسیت ناشناخته → «برادرم»
+- «برادرم» یا «خواهرم» فقط زمانی که هیچ اسمی موجود نباشد
 - آیات و احادیث فقط وقتی واقعاً مرتبط — نه تزئینی
 - اگر سیستم اطلاعات ناشناخته اعلام کرد، یکی را در سوالت بگنجان — هرگز مستقیم، هرگز بیش از یکی
 
@@ -815,8 +815,8 @@ export async function POST(request: NextRequest) {
     const intentNote = `\n[نوع پیام: ${intent.type} — قوانین مربوطه را اجرا کن]\n`;
     const subtleHint    = buildSubtleQuestionsHint(currentProfile, currentIdentity);
     const prayerContext = prayerTimings ? buildPrayerContext(prayerTimings, cityForPrayer) : '';
-    const nameHint      = (userName && !currentProfile.name)
-      ? `\n【اسم کاربر: ${userName} — در مکالمه از این اسم استفاده کن】\n`
+    const nameHint      = userName
+      ? `\n【اسم کاربر: ${userName} — همیشه از این اسم مستقیم استفاده کن، نه «برادرم» یا «خواهرم»】\n`
       : '';
 
     const lastSeen = currentIdentity.last_seen ? new Date(currentIdentity.last_seen) : null;
