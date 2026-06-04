@@ -56,7 +56,7 @@ export function OnboardingScreen({ onComplete }: Props) {
   };
 
   const monirMessage =
-    step === 0 ? "سلام، من منیرم — همراه روحت.\nاسمت چیه؟" :
+    step === 0 ? "سلام، من منیر هستم. اینجام تا در مسیر خدا همراهت باشم.\nنام شما چیست؟" :
     step === 1 ? `خوشوقتم ${name.trim()}!\nکجا زندگی می‌کنی؟` :
                  `${name.trim()} عزیز، الان بیشتر\nبه چی نیاز داری؟`;
 
