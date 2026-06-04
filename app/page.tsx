@@ -11,6 +11,7 @@ import { BottomNav }         from "@/components/BottomNav";
 import type { Tab }          from "@/components/BottomNav";
 import { ErrorBoundary }     from "@/components/ErrorBoundary";
 import type { Post }         from "@/lib/types";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
 
 /* ─── New Post Modal ──────────────────────────────── */
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -148,6 +149,9 @@ export default function App() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showNew,     setShowNew]     = useState(false);
 
+  /* new onboarding */
+  const [onboardingDone, setOnboardingDone] = useState(false);
+
   /* consent / onboarding */
   const [showConsent,     setShowConsent]     = useState(false);
   const [consentExpanded, setConsentExpanded] = useState(false);
@@ -157,6 +161,13 @@ export default function App() {
 
   const router      = useRouter();
   const feedInitRef = useRef(false);
+
+  /* ── New onboarding check ───────────────────────── */
+  useEffect(() => {
+    if (localStorage.getItem("monir-onboarding-done") === "true") {
+      setOnboardingDone(true);
+    }
+  }, []);
 
   /* ── Consent / onboarding check ─────────────────── */
   useEffect(() => {
@@ -252,6 +263,10 @@ export default function App() {
   }, [router]);
 
   /* ── Render ──────────────────────────────────────── */
+  if (!onboardingDone) {
+    return <OnboardingScreen onComplete={() => setOnboardingDone(true)} />;
+  }
+
   return (
     <>
       <div className="bg"></div>
