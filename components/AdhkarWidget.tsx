@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { morningAdhkar, eveningAdhkar, afterPrayerAdhkar, beforeSleepAdhkar, uponWakingAdhkar } from '@/lib/adhkarData';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AdhkarItem {
@@ -155,16 +156,20 @@ const EVENING: AdhkarItem[] = [
   },
 ];
 
+const AFTER_PRAYER: AdhkarItem[] = afterPrayerAdhkar.map(d => ({ ...d, title: d.note ?? '' }));
+const BEFORE_SLEEP: AdhkarItem[] = beforeSleepAdhkar.map(d => ({ ...d, title: d.note ?? '' }));
+const UPON_WAKING:  AdhkarItem[] = uponWakingAdhkar.map(d => ({ ...d, title: d.note ?? '' }));
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export function AdhkarWidget({ onClose }: { onClose: () => void }) {
-  const [mode,        setMode]        = useState<'morning' | 'evening'>(detectMode);
+  const [mode,        setMode]        = useState<'morning' | 'evening' | 'afterPrayer' | 'beforeSleep' | 'uponWaking'>(detectMode);
   const [idx,         setIdx]         = useState(0);
   const [tapCount,    setTapCount]    = useState(0);
   const [sessionDone, setSessionDone] = useState(false);
   const [leaving,     setLeaving]     = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const adhkar      = mode === 'morning' ? MORNING : EVENING;
+  const adhkar      = mode === 'morning' ? MORNING : mode === 'evening' ? EVENING : mode === 'afterPrayer' ? AFTER_PRAYER : mode === 'beforeSleep' ? BEFORE_SLEEP : UPON_WAKING;
   const current     = adhkar[idx] ?? adhkar[0];
   const doneCurrent = tapCount >= current.count;
 
@@ -259,8 +264,8 @@ export function AdhkarWidget({ onClose }: { onClose: () => void }) {
   const circ   = 2 * Math.PI * R;
   const filled = doneCurrent ? 0 : circ * (1 - tapCount / current.count);
 
-  const modeLabel = mode === 'morning' ? 'أذكار الصباح' : 'أذكار المساء';
-  const modeFA    = mode === 'morning' ? 'اذکار صبح'    : 'اذکار شب';
+  const modeLabel = mode === 'morning' ? 'أذكار الصباح' : mode === 'evening' ? 'أذكار المساء' : mode === 'afterPrayer' ? 'أذكار بعد از نماز' : mode === 'beforeSleep' ? 'أذكار قبل از خواب' : 'أذكار بیدار شدن';
+  const modeFA    = mode === 'morning' ? 'اذکار صبح'    : mode === 'evening' ? 'اذکار شب'     : mode === 'afterPrayer' ? 'بعد از نماز'       : mode === 'beforeSleep' ? 'قبل از خواب'       : 'بیدار شدن';
 
   return (
     <div className="ad" onClick={handleScreenTap}>
@@ -289,6 +294,15 @@ export function AdhkarWidget({ onClose }: { onClose: () => void }) {
           }
         </button>
       </header>
+
+      {/* ── Category selector ── */}
+      <div className="ad-cats" onClick={e => e.stopPropagation()}>
+        <button className={`ad-cat${mode === 'morning'     ? ' ad-cat-active' : ''}`} onClick={() => { setMode('morning');     setIdx(0); setTapCount(0); setSessionDone(false); }}>صبح</button>
+        <button className={`ad-cat${mode === 'evening'     ? ' ad-cat-active' : ''}`} onClick={() => { setMode('evening');     setIdx(0); setTapCount(0); setSessionDone(false); }}>شب</button>
+        <button className={`ad-cat${mode === 'afterPrayer' ? ' ad-cat-active' : ''}`} onClick={() => { setMode('afterPrayer'); setIdx(0); setTapCount(0); setSessionDone(false); }}>بعد از نماز</button>
+        <button className={`ad-cat${mode === 'beforeSleep' ? ' ad-cat-active' : ''}`} onClick={() => { setMode('beforeSleep'); setIdx(0); setTapCount(0); setSessionDone(false); }}>قبل از خواب</button>
+        <button className={`ad-cat${mode === 'uponWaking'  ? ' ad-cat-active' : ''}`} onClick={() => { setMode('uponWaking');  setIdx(0); setTapCount(0); setSessionDone(false); }}>بیدار شدن</button>
+      </div>
 
       {/* ── Suggestion banner ── */}
       {suggest && !sessionDone && (
@@ -408,6 +422,32 @@ export function AdhkarWidget({ onClose }: { onClose: () => void }) {
         .ad-mode-icon { font-size: 22px; }
         .ad-hdr-title { font-size: 16px; font-weight: 600; color: #d4a017; }
         .ad-hdr-sub   { font-size: 11px; color: rgba(212,160,23,0.44); margin-top: 1px; }
+
+        /* ── category selector ── */
+        .ad-cats {
+          position: relative; z-index: 2;
+          width: 100%; display: flex; gap: 6px;
+          padding: 8px 14px; overflow-x: auto; scrollbar-width: none;
+          background: rgba(2,6,20,0.60); backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(212,160,23,0.10);
+          flex-shrink: 0;
+        }
+        .ad-cats::-webkit-scrollbar { display: none; }
+        .ad-cat {
+          flex-shrink: 0; padding: 5px 14px; border-radius: 20px;
+          border: 1px solid rgba(212,160,23,0.22);
+          background: rgba(212,160,23,0.07);
+          color: rgba(212,160,23,0.55);
+          font-family: 'Vazirmatn', sans-serif; font-size: 12px;
+          cursor: pointer; transition: all .18s;
+          white-space: nowrap;
+        }
+        .ad-cat:hover { background: rgba(212,160,23,0.14); color: rgba(212,160,23,0.85); }
+        .ad-cat-active {
+          background: rgba(212,160,23,0.18) !important;
+          border-color: rgba(212,160,23,0.55) !important;
+          color: #d4a017 !important;
+        }
 
         /* ── suggestion banner ── */
         .ad-suggest {
