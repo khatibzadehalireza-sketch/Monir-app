@@ -340,6 +340,9 @@ export default function PrayerPage() {
               <div className="cd-prayer">{PRAYER_FA[next.name]}</div>
               <div className="cd-clock">{cd}</div>
               <div className="cd-time">{next.time} — {isNextDay(next.time) ? 'فردا' : 'امروز'}</div>
+              <div className="cd-hijri">
+                {new Intl.DateTimeFormat('fa-u-ca-islamic', { day:'numeric', month:'long', year:'numeric' }).format(new Date())}
+              </div>
             </div>
           )}
 
@@ -609,7 +612,8 @@ export default function PrayerPage() {
           text-shadow:0 0 20px rgba(212,160,23,0.30);
           font-family:ui-monospace,monospace;
         }
-        .cd-time { font-size:13px; color:rgba(212,160,23,0.45); margin-top:2px; }
+        .cd-time  { font-size:13px; color:rgba(212,160,23,0.45); margin-top:2px; }
+        .cd-hijri { font-size:11px; color:rgba(212,160,23,0.38); margin-top:1px; }
 
         /* ── section titles ── */
         .section { display:flex; flex-direction:column; gap:10px; }
