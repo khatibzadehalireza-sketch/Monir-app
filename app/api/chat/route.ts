@@ -717,8 +717,9 @@ export async function POST(request: NextRequest) {
     const ipCity    = request.headers.get('x-vercel-ip-city')    ?? null;
 
     // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی + before scores در parallel ---
-    const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
-    const isTasbihQuery     = /تسبیح|ذکر/u.test(message);
+    const isPrayerTimeQuery     = PRAYER_TIME_RE.test(message);
+    const isPrayerQuestionQuery = /نماز قضا|نماز جمعه|نماز آیات|نماز مستحب|چطور نماز|روش نماز|نحوه نماز|نماز چطور خونده میشه|وقت نماز چیه|نماز صبح چند رکعت/u.test(message);
+    const isTasbihQuery         = /تسبیح|ذکر/u.test(message);
     const isAdhkarQuery     = /اذکار|اذکار صبح|اذکار شب|ذکر صبح|ذکر شب|ذکر بگم|ذکر بگویم|میخوام ذکر|می‌خوام ذکر|وقت ذکره|اوقات اذکار|adhkar|morning adhkar|evening adhkar|hisnulmuslim|میخوام ذکر بگم|می‌خوام ذکر بگم|بیا ذکر بگیم|وقت اذکاره|اذکار امشب|اذکار امروز|ذکر یادم رفت|دلم میخواد ذکر بگم|چند تا ذکر|اذکار مساء|اذکار صباح|after prayer dhikr|before sleep dhikr/i.test(message);
     const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult, existingLifeEventsResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
@@ -726,7 +727,7 @@ export async function POST(request: NextRequest) {
       supabase.from('conversations').select('role, content').eq('user_id', userId)
         .in('role', ['user', 'assistant']).order('created_at', { ascending: false }).limit(10),
       supabase.from('user_identity').select('*').eq('user_id', userId).maybeSingle(),
-      isPrayerTimeQuery && ipCity
+      isPrayerTimeQuery && !isPrayerQuestionQuery && ipCity
         ? fetchPrayerTimes(ipCity, ipCountry ?? '')
         : Promise.resolve(null),
       sessionMessageCount >= 5
