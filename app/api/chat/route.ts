@@ -719,7 +719,7 @@ export async function POST(request: NextRequest) {
     // --- لیمیت + پروفایل + تاریخچه + هویت + اوقات شرعی + before scores در parallel ---
     const isPrayerTimeQuery = PRAYER_TIME_RE.test(message);
     const isTasbihQuery     = /تسبیح|ذکر/u.test(message);
-    const isAdhkarQuery     = /اذکار|اذکار صبح|اذکار شب|ذکر صبح|ذکر شب|ذکر بگم|ذکر بگویم|میخوام ذکر|می‌خوام ذکر|وقت ذکره|اوقات اذکار|adhkar|morning adhkar|evening adhkar|hisnulmuslim/i.test(message);
+    const isAdhkarQuery     = /اذکار|اذکار صبح|اذکار شب|ذکر صبح|ذکر شب|ذکر بگم|ذکر بگویم|میخوام ذکر|می‌خوام ذکر|وقت ذکره|اوقات اذکار|adhkar|morning adhkar|evening adhkar|hisnulmuslim|میخوام ذکر بگم|می‌خوام ذکر بگم|بیا ذکر بگیم|وقت اذکاره|اذکار امشب|اذکار امروز|ذکر یادم رفت|دلم میخواد ذکر بگم|چند تا ذکر|اذکار مساء|اذکار صباح|after prayer dhikr|before sleep dhikr/i.test(message);
     const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult, existingLifeEventsResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
