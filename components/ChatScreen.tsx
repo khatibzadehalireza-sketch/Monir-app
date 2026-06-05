@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Message } from "@/lib/types";
 import { TasbihWidget } from "@/components/TasbihWidget";
 import { AdhkarWidget } from "@/components/AdhkarWidget";
+import PrayerTrackerWidget from "@/components/PrayerTrackerWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
@@ -145,6 +146,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
   const [showFeedback,      setShowFeedback]      = useState(false);
   const [showTasbih,        setShowTasbih]        = useState(false);
   const [showAdhkar,        setShowAdhkar]        = useState(false);
+  const [showPrayerTracker, setShowPrayerTracker] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   const endRef           = useRef<HTMLDivElement>(null);
@@ -328,6 +330,11 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
                 🌙 باز کردن اذکار
               </button>
             )}
+            {m.widget === 'prayerTracker' && (
+              <button className="wgt-tasbih-btn" onClick={() => setShowPrayerTracker(true)}>
+                🕌 ثبت نمازهای امروز
+              </button>
+            )}
           </Fragment>
         ))}
         {isLoading && (
@@ -373,8 +380,9 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
         </div>
       </div>
 
-      {showTasbih && <TasbihWidget onClose={() => setShowTasbih(false)} />}
-      {showAdhkar && <AdhkarWidget onClose={() => setShowAdhkar(false)} />}
+      {showTasbih        && <TasbihWidget        onClose={() => setShowTasbih(false)} />}
+      {showAdhkar        && <AdhkarWidget        onClose={() => setShowAdhkar(false)} />}
+      {showPrayerTracker && <PrayerTrackerWidget onClose={() => setShowPrayerTracker(false)} />}
     </div>
   );
 }
