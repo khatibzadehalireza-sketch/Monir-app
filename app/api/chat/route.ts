@@ -721,7 +721,8 @@ export async function POST(request: NextRequest) {
     const isPrayerQuestionQuery = /نماز قضا|نماز جمعه|نماز آیات|نماز مستحب|چطور نماز|روش نماز|نحوه نماز|نماز چطور خونده میشه|وقت نماز چیه|نماز صبح چند رکعت/u.test(message);
     const isTasbihQuery         = /تسبیح|ذکر/u.test(message);
     const isPrayerTrackerQuery  = /ردیابی نماز|نمازم رو خوندم|نمازم را خواندم|نماز خوندم|تیک نماز|نمازامو ثبت کنم|نمازهامو ثبت کنم|چک نماز/i.test(message);
-    const isAdhkarQuery     = /اذکار|اذکار صبح|اذکار شب|ذکر صبح|ذکر شب|ذکر بگم|ذکر بگویم|میخوام ذکر|می‌خوام ذکر|وقت ذکره|اوقات اذکار|adhkar|morning adhkar|evening adhkar|hisnulmuslim|میخوام ذکر بگم|می‌خوام ذکر بگم|بیا ذکر بگیم|وقت اذکاره|اذکار امشب|اذکار امروز|ذکر یادم رفت|دلم میخواد ذکر بگم|چند تا ذکر|اذکار مساء|اذکار صباح|after prayer dhikr|before sleep dhikr/i.test(message);
+    const isAdhkarQuery        = /اذکار|اذکار صبح|اذکار شب|ذکر صبح|ذکر شب|ذکر بگم|ذکر بگویم|میخوام ذکر|می‌خوام ذکر|وقت ذکره|اوقات اذکار|adhkar|morning adhkar|evening adhkar|hisnulmuslim|میخوام ذکر بگم|می‌خوام ذکر بگم|بیا ذکر بگیم|وقت اذکاره|اذکار امشب|اذکار امروز|ذکر یادم رفت|دلم میخواد ذکر بگم|چند تا ذکر|اذکار مساء|اذکار صباح|after prayer dhikr|before sleep dhikr/i.test(message);
+    const isNamesOfAllahQuery  = /۹۹ اسم|اسماء الحسنی|اسم الله|names of allah|asma ul husna|یا الله|اسمهای خدا/i.test(message);
     const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult, existingLifeEventsResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
@@ -1291,7 +1292,7 @@ export async function POST(request: NextRequest) {
       }).then(({ error }) => { if (error) console.error('[safety_risk insert]', error.message); });
     }
 
-    return NextResponse.json({ reply, uiComponent: isPrayerTimeQuery ? 'prayer' : isAdhkarQuery ? 'adhkar' : isTasbihQuery ? 'tasbih' : isPrayerTrackerQuery ? 'prayerTracker' : undefined });
+    return NextResponse.json({ reply, uiComponent: isPrayerTimeQuery ? 'prayer' : isAdhkarQuery ? 'adhkar' : isTasbihQuery ? 'tasbih' : isPrayerTrackerQuery ? 'prayerTracker' : isNamesOfAllahQuery ? 'namesOfAllah' : undefined });
 
   } catch (error) {
     console.error('خطا:', error);
