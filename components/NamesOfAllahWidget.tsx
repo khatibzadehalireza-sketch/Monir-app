@@ -126,8 +126,7 @@ function dailyIndex(): number {
 }
 
 function audioUrl(num: number): string {
-  const padded = String(num).padStart(3, '0');
-  return `https://cdn.islamic.network/99names/audio/${padded}.mp3`;
+  return `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${num}.mp3`;
 }
 
 // ─── Audio state type ─────────────────────────────────────────────────────────
