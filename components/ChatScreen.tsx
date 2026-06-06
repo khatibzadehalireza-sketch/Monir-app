@@ -6,6 +6,7 @@ import type { Message } from "@/lib/types";
 import { TasbihWidget } from "@/components/TasbihWidget";
 import { AdhkarWidget } from "@/components/AdhkarWidget";
 import PrayerTrackerWidget from "@/components/PrayerTrackerWidget";
+import NamesOfAllahWidget from "@/components/NamesOfAllahWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const OPENING = "اینجام و دوست دارم بشنوم 🌙";
@@ -335,6 +336,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
                 🕌 ثبت نمازهای امروز
               </button>
             )}
+            {m.widget === 'namesOfAllah' && <ErrorBoundary silent><NamesOfAllahWidget onClose={() => {}} /></ErrorBoundary>}
           </Fragment>
         ))}
         {isLoading && (
