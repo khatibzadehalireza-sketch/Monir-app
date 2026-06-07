@@ -174,7 +174,7 @@ export default function NamesOfAllahWidget({ onClose }: { onClose: () => void })
     }
     stopAudio();
 
-    const utterance = new SpeechSynthesisUtterance(names[currentIndex].arabic);
+    const utterance = new SpeechSynthesisUtterance(NAMES[currentIndex].arabic);
     utterance.lang = 'ar-SA';
     utterance.rate = 0.8;
     utterance.onstart = () => setAudioState('playing');
