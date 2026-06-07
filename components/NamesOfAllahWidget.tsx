@@ -174,19 +174,14 @@ export default function NamesOfAllahWidget({ onClose }: { onClose: () => void })
     }
     stopAudio();
 
-    const audio = new Audio();
-    audioRef.current = audio;
-    setPlayingNum(num);
-    setAudioState('loading');
-
-    audio.oncanplaythrough = () => {
-      audio.load();
-      audio.play().then(() => setAudioState('playing')).catch(() => setAudioState('error'));
-    };
-    audio.onended  = () => { setAudioState('idle'); setPlayingNum(null); };
-    audio.onerror  = () => { setAudioState('error'); setPlayingNum(null); };
-    audio.src = audioUrl(num);
-    audio.load();
+    const utterance = new SpeechSynthesisUtterance(names[currentIndex].arabic);
+    utterance.lang = 'ar-SA';
+    utterance.rate = 0.8;
+    utterance.onstart = () => setAudioState('playing');
+    utterance.onend = () => { setAudioState('idle'); setPlayingNum(null); };
+    utterance.onerror = () => setAudioState('error');
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
   }, [playingNum, audioState, stopAudio]);
 
   useEffect(() => () => stopAudio(), [stopAudio]);
