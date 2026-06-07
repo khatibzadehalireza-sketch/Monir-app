@@ -172,6 +172,9 @@ export default function NamesOfAllahWidget({ onClose }: { onClose: () => void })
 
     const utterance = new SpeechSynthesisUtterance(NAMES.find(n => n.num === num)?.arabic ?? '');
     utterance.lang = 'ar-SA';
+    const voices = window.speechSynthesis.getVoices();
+    const arabicMale = voices.find(v => v.lang.startsWith('ar') && v.name.toLowerCase().includes('male')) || voices.find(v => v.lang.startsWith('ar'));
+    if (arabicMale) utterance.voice = arabicMale;
     utterance.rate = 0.8;
     utterance.onstart = () => setAudioState('playing');
     utterance.onend = () => { setAudioState('idle'); setPlayingNum(null); };
