@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI, TaskType } from '@google/generative-ai';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -41,16 +40,19 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// Same model and dimensions used by the chat route for consistency
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+// gemini-embedding-001 via v1 REST API (text-embedding-004 is unavailable on this key).
+// batchEmbedContents sends up to EMBED_BATCH texts per API call — 20× fewer quota hits.
+const GEMINI_BATCH_URL =
+  `https://generativelanguage.googleapis.com/v1/models/gemini-embedding-001:batchEmbedContents?key=${GEMINI_API_KEY}`;
 
-const BATCH_SIZE = 100;
-const DELAY_BETWEEN_REQUESTS_MS = 50; // stay well within Gemini free-tier limit (1500 rpm)
-const DELAY_BETWEEN_BATCHES_MS = 1000;
+const FETCH_BATCH_SIZE = 100;   // hadiths fetched from Supabase per loop iteration
+const EMBED_BATCH = 20;         // texts per batchEmbedContents call (max ~100, 20 is safe)
+// Free tier: ~100 API calls/min. At EMBED_BATCH=20, that's 2000 embeddings/min.
+// 1500ms between API calls stays well under the RPM limit.
+const DELAY_BETWEEN_API_CALLS_MS = 1500;
+const DELAY_BETWEEN_FETCH_BATCHES_MS = 2000;
 const EMBEDDING_DIMENSIONS = 384;
-// Gemini text-embedding-004 has a ~2048-token limit; truncate to ~6000 chars to be safe
-const MAX_TEXT_LENGTH = 6000;
+const MAX_TEXT_LENGTH = 6000;   // ~2048 token limit; 6000 chars is safely within it
 
 interface Hadith {
   collection_key: string;
@@ -62,18 +64,39 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function embedText(text: string): Promise<number[]> {
-  const truncated = text.length > MAX_TEXT_LENGTH ? text.slice(0, MAX_TEXT_LENGTH) : text;
-  const result = await embeddingModel.embedContent({
-    content: { role: 'user', parts: [{ text: truncated }] },
-    taskType: TaskType.SEMANTIC_SIMILARITY,
+async function batchEmbed(texts: string[], retries = 4): Promise<number[][]> {
+  const requests = texts.map((text) => ({
+    model: 'models/gemini-embedding-001',
+    content: { parts: [{ text: text.slice(0, MAX_TEXT_LENGTH) }] },
+    taskType: 'SEMANTIC_SIMILARITY',
     outputDimensionality: EMBEDDING_DIMENSIONS,
-  } as import('@google/generative-ai').EmbedContentRequest & { outputDimensionality: number });
-  return result.embedding.values;
+  }));
+
+  const res = await fetch(GEMINI_BATCH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests }),
+  });
+
+  if (res.status === 429 && retries > 0) {
+    const errBody = await res.text();
+    const match = errBody.match(/retry in ([\d.]+)s/i);
+    const waitMs = match ? Math.ceil(parseFloat(match[1]) * 1000) + 1000 : 65_000;
+    console.warn(`  [rate-limit] 429 — waiting ${(waitMs / 1000).toFixed(0)}s (${retries} retries left)`);
+    await delay(waitMs);
+    return batchEmbed(texts, retries - 1);
+  }
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini batch embed error ${res.status}: ${err.slice(0, 200)}`);
+  }
+
+  const json = (await res.json()) as { embeddings: Array<{ values: number[] }> };
+  return json.embeddings.map((e) => e.values);
 }
 
-async function fetchUntranslatedBatch(offset: number): Promise<Hadith[]> {
-  // Fetch hadiths with english_text
+async function fetchUnembeddedBatch(offset: number): Promise<Hadith[]> {
   const { data: hadiths, error: hErr } = await supabase
     .from('library_hadiths')
     .select('collection_key, hadith_number, english_text')
@@ -81,12 +104,11 @@ async function fetchUntranslatedBatch(offset: number): Promise<Hadith[]> {
     .neq('english_text', '')
     .order('collection_key')
     .order('hadith_number')
-    .range(offset, offset + BATCH_SIZE * 3 - 1); // fetch extra to account for already embedded
+    .range(offset, offset + FETCH_BATCH_SIZE * 3 - 1);
 
   if (hErr) throw new Error(`Hadiths query failed: ${hErr.message}`);
   if (!hadiths?.length) return [];
 
-  // Get embedding status for this page's collections
   const collectionKeys = [...new Set(hadiths.map((h) => h.collection_key))];
   const { data: existing, error: eErr } = await supabase
     .from('library_hadith_embeddings')
@@ -95,56 +117,58 @@ async function fetchUntranslatedBatch(offset: number): Promise<Hadith[]> {
 
   if (eErr) throw new Error(`Embeddings query failed: ${eErr.message}`);
 
-  const done = new Set(
-    (existing ?? []).map((r) => `${r.collection_key}:${r.hadith_number}`),
-  );
+  const done = new Set((existing ?? []).map((r) => `${r.collection_key}:${r.hadith_number}`));
 
   return hadiths
     .filter((h) => !done.has(`${h.collection_key}:${h.hadith_number}`))
-    .slice(0, BATCH_SIZE);
+    .slice(0, FETCH_BATCH_SIZE);
 }
 
 async function processBatch(hadiths: Hadith[]): Promise<{ success: number; failed: number }> {
   let success = 0;
   let failed = 0;
 
-  for (const hadith of hadiths) {
+  // Split into mini-batches of EMBED_BATCH for the API call
+  for (let i = 0; i < hadiths.length; i += EMBED_BATCH) {
+    const chunk = hadiths.slice(i, i + EMBED_BATCH);
+
+    let embeddings: number[][];
     try {
-      const embedding = await embedText(hadith.english_text);
-
-      const { error } = await supabase.from('library_hadith_embeddings').upsert(
-        {
-          collection_key: hadith.collection_key,
-          hadith_number: hadith.hadith_number,
-          embedding,
-        },
-        { onConflict: 'collection_key,hadith_number' },
-      );
-
-      if (error) {
-        console.error(
-          `  [error] ${hadith.collection_key}:${hadith.hadith_number} — ${error.message}`,
-        );
-        failed++;
-      } else {
-        success++;
-      }
+      embeddings = await batchEmbed(chunk.map((h) => h.english_text));
     } catch (err) {
-      console.error(
-        `  [error] ${hadith.collection_key}:${hadith.hadith_number} — ${(err as Error).message}`,
-      );
-      failed++;
+      console.error(`  [error] batch embed failed (chunk ${i}–${i + chunk.length}): ${(err as Error).message}`);
+      failed += chunk.length;
+      await delay(DELAY_BETWEEN_API_CALLS_MS);
+      continue;
     }
 
-    await delay(DELAY_BETWEEN_REQUESTS_MS);
+    const rows = chunk.map((h, idx) => ({
+      collection_key: h.collection_key,
+      hadith_number: h.hadith_number,
+      embedding: embeddings[idx],
+    }));
+
+    const { error } = await supabase
+      .from('library_hadith_embeddings')
+      .upsert(rows, { onConflict: 'collection_key,hadith_number' });
+
+    if (error) {
+      console.error(`  [error] upsert failed (chunk ${i}–${i + chunk.length}): ${error.message}`);
+      failed += chunk.length;
+    } else {
+      console.log(`  [ok] ${i + chunk.length}/${hadiths.length} embedded`);
+      success += chunk.length;
+    }
+
+    await delay(DELAY_BETWEEN_API_CALLS_MS);
   }
 
   return { success, failed };
 }
 
 async function main(): Promise<void> {
-  console.log('Generating hadith embeddings using Gemini text-embedding-004 (384-dim)...');
-  console.log(`Batch size: ${BATCH_SIZE} | Request delay: ${DELAY_BETWEEN_REQUESTS_MS}ms\n`);
+  console.log('Generating hadith embeddings — Gemini gemini-embedding-001 (384-dim, batch mode)');
+  console.log(`Fetch batch: ${FETCH_BATCH_SIZE} hadiths | API batch: ${EMBED_BATCH} texts/call | Delay: ${DELAY_BETWEEN_API_CALLS_MS}ms\n`);
 
   let offset = 0;
   let totalSuccess = 0;
@@ -152,7 +176,7 @@ async function main(): Promise<void> {
   let batchNum = 0;
 
   while (true) {
-    const hadiths = await fetchUntranslatedBatch(offset);
+    const hadiths = await fetchUnembeddedBatch(offset);
 
     if (!hadiths.length) {
       console.log('\nNo more hadiths without embeddings.');
@@ -160,7 +184,7 @@ async function main(): Promise<void> {
     }
 
     batchNum++;
-    console.log(`Batch ${batchNum}: embedding ${hadiths.length} hadiths (offset ${offset})...`);
+    console.log(`Batch ${batchNum}: ${hadiths.length} hadiths (offset ${offset})...`);
 
     const { success, failed } = await processBatch(hadiths);
     totalSuccess += success;
@@ -171,10 +195,10 @@ async function main(): Promise<void> {
         ` | total: ${totalSuccess} embedded, ${totalFailed} failed`,
     );
 
-    if (hadiths.length < BATCH_SIZE) break;
+    if (hadiths.length < FETCH_BATCH_SIZE) break;
 
-    offset += BATCH_SIZE;
-    await delay(DELAY_BETWEEN_BATCHES_MS);
+    offset += FETCH_BATCH_SIZE;
+    await delay(DELAY_BETWEEN_FETCH_BATCHES_MS);
   }
 
   console.log(`\nDone — total embedded: ${totalSuccess}, total failed: ${totalFailed}`);
