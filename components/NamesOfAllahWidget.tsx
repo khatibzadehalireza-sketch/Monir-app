@@ -158,11 +158,7 @@ export default function NamesOfAllahWidget({ onClose }: { onClose: () => void })
 
   // ── Audio ─────────────────────────────────────────────────────────────────
   const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
+    window.speechSynthesis.cancel();
     setAudioState('idle');
     setPlayingNum(null);
   }, []);
@@ -174,7 +170,7 @@ export default function NamesOfAllahWidget({ onClose }: { onClose: () => void })
     }
     stopAudio();
 
-    const utterance = new SpeechSynthesisUtterance(NAMES[currentIndex].arabic);
+    const utterance = new SpeechSynthesisUtterance(NAMES.find(n => n.num === num)?.arabic ?? '');
     utterance.lang = 'ar-SA';
     utterance.rate = 0.8;
     utterance.onstart = () => setAudioState('playing');
