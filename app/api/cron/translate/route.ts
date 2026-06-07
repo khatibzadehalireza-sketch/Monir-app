@@ -5,13 +5,14 @@ import { getSupabase } from '@/lib/supabase';
 // Allow up to 300 s on Vercel Pro — translating 200 hadiths takes ~1-2 min
 export const maxDuration = 300;
 
-const PRIORITY_LANGUAGES = ['tr', 'fr', 'de', 'ur', 'id', 'bn', 'es'] as const;
+const PRIORITY_LANGUAGES = ['tr', 'fr', 'de', 'prs', 'ur', 'id', 'bn', 'es'] as const;
 type Lang = (typeof PRIORITY_LANGUAGES)[number];
 
 const LANGUAGE_NAMES: Record<Lang, string> = {
   tr: 'Turkish',
   fr: 'French',
   de: 'German',
+  prs: 'Dari',
   ur: 'Urdu',
   id: 'Indonesian',
   bn: 'Bengali',
