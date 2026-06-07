@@ -180,6 +180,7 @@ export default function NamesOfAllahWidget({ onClose }: { onClose: () => void })
     setAudioState('loading');
 
     audio.oncanplaythrough = () => {
+      audio.load();
       audio.play().then(() => setAudioState('playing')).catch(() => setAudioState('error'));
     };
     audio.onended  = () => { setAudioState('idle'); setPlayingNum(null); };
