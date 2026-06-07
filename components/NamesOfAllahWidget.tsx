@@ -126,7 +126,7 @@ function dailyIndex(): number {
 }
 
 function audioUrl(num: number): string {
-  return `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${num}.mp3`;
+  return `https://www.islamicfinder.org/data/audios/99names/${num}.mp3`;
 }
 
 // ─── Audio state type ─────────────────────────────────────────────────────────
