@@ -126,7 +126,9 @@ function dailyIndex(): number {
 }
 
 function audioUrl(num: number): string {
-  return `https://www.islamicfinder.org/data/audios/99names/${num}.mp3`;
+  const audioNames: Record<number, string> = {1:'rahman',2:'rahim',3:'malik',4:'quddus',5:'salam',6:'mumin',7:'muhaymin',8:'aziz',9:'jabbar',10:'mutakabbir',11:'khaliq',12:'bari',13:'musawwir',14:'ghaffar',15:'qahhar',16:'wahhab',17:'razzaq',18:'fattah',19:'alim',20:'qabid',21:'basit',22:'khafid',23:'rafi',24:'muizz',25:'mudhill',26:'sami',27:'basir',28:'hakam',29:'adl',30:'latif',31:'khabir',32:'halim',33:'azim',34:'ghafur',35:'shakur',36:'aliyy',37:'kabir',38:'hafiz',39:'muqit',40:'hasib',41:'jalil',42:'karim',43:'raqib',44:'mujib',45:'wasi',46:'hakim',47:'wadud',48:'majid',49:'baith',50:'shahid',51:'haqq',52:'wakil',53:'qawiyy',54:'matin',55:'waliyy',56:'hamid',57:'muhsi',58:'mubdi',59:'muid',60:'muhyi',61:'mumit',62:'hayy',63:'qayyum',64:'wajid',65:'majid',66:'wahid',67:'ahad',68:'samad',69:'qadir',70:'muqtadir',71:'muqaddim',72:'muakhkhir',73:'awwal',74:'akhir',75:'zahir',76:'batin',77:'wali',78:'mutaali',79:'barr',80:'tawwab',81:'muntaqim',82:'afuww',83:'rauf',84:'malikulmulk',85:'dhuljalal',86:'muqsit',87:'jami',88:'ghani',89:'mughni',90:'mani',91:'darr',92:'nafi',93:'nur',94:'hadi',95:'badi',96:'baqi',97:'warith',98:'rashid',99:'sabur'};
+  const name = audioNames[num] || 'rahman';
+  return `https://islamicapi.com/audio/asma-ul-husna/${name}.mp3`;
 }
 
 // ─── Audio state type ─────────────────────────────────────────────────────────
