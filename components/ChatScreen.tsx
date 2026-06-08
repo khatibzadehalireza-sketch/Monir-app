@@ -339,6 +339,7 @@ export function ChatScreen({ onBack, userName, onOpenPost }: Props) {
             )}
             {m.widget === 'namesOfAllah' && <ErrorBoundary silent><NamesOfAllahWidget onClose={() => {}} /></ErrorBoundary>}
             {m.widget === 'dailyHadith' && <ErrorBoundary silent><DailyHadithWidget onClose={() => {}} /></ErrorBoundary>}
+            {m.widget === 'library' && <div style={{padding:'12px 0'}}><button onClick={() => { const r = (window as any).__router || document.querySelector('a[href="/library"]'); window.location.href='/library'; }} style={{background:'rgba(212,160,23,0.15)',border:'1px solid rgba(212,160,23,0.4)',color:'#d4a017',padding:'14px 24px',borderRadius:'12px',fontSize:'15px',cursor:'pointer',width:'100%',textAlign:'center'}}>📚 باز کردن کتابخانه منیر</button></div>}
           </Fragment>
         ))}
         {isLoading && (

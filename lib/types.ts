@@ -22,5 +22,5 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   id: string;
-  widget?: "prayer" | "qibla" | "post" | "tasbih" | "adhkar" | "prayerTracker" | "namesOfAllah" | "dailyHadith";
+  widget?: "prayer" | "qibla" | "post" | "tasbih" | "adhkar" | "prayerTracker" | "namesOfAllah" | "dailyHadith" | "library";
 }
