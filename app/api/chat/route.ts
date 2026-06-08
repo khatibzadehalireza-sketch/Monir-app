@@ -679,7 +679,7 @@ async function generateEmotionEmbedding(
   return result.embedding.values;
 }
 
-type UiComponent = 'prayer' | 'adhkar' | 'tasbih' | 'prayerTracker' | 'namesOfAllah' | 'dailyHadith';
+type UiComponent = 'prayer' | 'adhkar' | 'tasbih' | 'prayerTracker' | 'namesOfAllah' | 'dailyHadith' | 'library';
 
 export async function POST(request: NextRequest) {
   try {
@@ -726,6 +726,7 @@ export async function POST(request: NextRequest) {
     const isAdhkarQuery        = /اذکار|اذکار صبح|اذکار شب|ذکر صبح|ذکر شب|ذکر بگم|ذکر بگویم|میخوام ذکر|می‌خوام ذکر|وقت ذکره|اوقات اذکار|adhkar|morning adhkar|evening adhkar|hisnulmuslim|میخوام ذکر بگم|می‌خوام ذکر بگم|بیا ذکر بگیم|وقت اذکاره|اذکار امشب|اذکار امروز|ذکر یادم رفت|دلم میخواد ذکر بگم|چند تا ذکر|اذکار مساء|اذکار صباح|after prayer dhikr|before sleep dhikr/i.test(message);
     const isNamesOfAllahQuery  = /۹۹ اسم|اسماء الحسنی|اسم الله|names of allah|asma ul husna|یا الله|اسمهای خدا/i.test(message);
     const isHadithQuery        = /حدیث روزانه|حدیث امروز|hadith|حدیث|نقل قول اسلامی/i.test(message);
+    const isLibraryQuery       = /کتابخانه|library|کتاب احادیث|جستجو در احادیث|بخاری|مسلم|ابوداود|ترمذی|ریاض الصالحین|اربعین|بلوغ المرام/i.test(message);
     const [countResult, profileResult, historyResult, identityResult, rawPrayerTimings, sessionBeforeResult, bpResult, existingLifeEventsResult] = await Promise.all([
       supabase.from('message_counts').select('count').eq('user_id', userId).eq('date', today).maybeSingle(),
       supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
@@ -1302,6 +1303,7 @@ export async function POST(request: NextRequest) {
       isPrayerTrackerQuery ? 'prayerTracker':
       isNamesOfAllahQuery  ? 'namesOfAllah' :
       isHadithQuery        ? 'dailyHadith'  :
+      isLibraryQuery       ? 'library'      :
       undefined;
     return NextResponse.json({ reply, uiComponent });
 
