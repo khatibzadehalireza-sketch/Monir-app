@@ -39,7 +39,8 @@
       "WebFetch(domain:mixkit.co)",
       "Bash(powershell -Command \"Start-Process -FilePath 'npx' -ArgumentList 'next','dev','--port','3131' -RedirectStandardOutput 'C:\\\\Users\\\\Gebruiker\\\\monir-app\\\\next-dev.log' -RedirectStandardError 'C:\\\\Users\\\\Gebruiker\\\\monir-app\\\\next-dev-err.log' -WindowStyle Hidden -WorkingDirectory 'C:\\\\Users\\\\Gebruiker\\\\monir-app'\")",
       "Bash(node *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(npx tsx *)"
     ]
   }
 }
