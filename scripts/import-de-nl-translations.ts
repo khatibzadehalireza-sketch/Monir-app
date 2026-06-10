@@ -34,7 +34,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 });
 
 const BASE = 'https://hadeethenc.com/api/v1';
-const DELAY_MS = 300;
+const DELAY_MS = 150;
 const PER_PAGE = 100;
 
 // Arabic book name → our collection_key
@@ -109,34 +109,23 @@ function parseReference(ref: string): { collectionKey: string; hadithNumber: num
   return { collectionKey, hadithNumber };
 }
 
-// Collect all hadith IDs by paginating through every root (and sub) category.
+// Collect all hadith IDs using only the 7 root categories.
+// The list endpoint returns hadiths for the full category tree under each root,
+// so there's no need to enumerate sub-categories.
 async function collectAllHadithIds(): Promise<Set<string>> {
   const ids = new Set<string>();
 
   const rootCats = await fetchJson<Category[]>(`${BASE}/categories/roots/?language=en`);
   if (!rootCats) throw new Error('Could not fetch root categories');
+  await delay(DELAY_MS);
 
-  // Also fetch sub-categories for each root
-  const allCatIds: string[] = [];
+  console.log(`  Paging through ${rootCats.length} root categories...`);
+
   for (const root of rootCats) {
-    const subCats = await fetchJson<Category[]>(
-      `${BASE}/categories/list/?language=en&parent_id=${root.id}`,
-    );
-    await delay(DELAY_MS);
-    if (subCats && Array.isArray(subCats) && subCats.length > 0) {
-      allCatIds.push(...subCats.map((c) => c.id));
-    } else {
-      allCatIds.push(root.id);
-    }
-  }
-
-  console.log(`  Fetching hadith IDs from ${allCatIds.length} categories...`);
-
-  for (const catId of allCatIds) {
     let page = 1;
     while (true) {
       const data = await fetchJson<HadithListResponse>(
-        `${BASE}/hadeeths/list/?language=en&category_id=${catId}&page=${page}&per_page=${PER_PAGE}`,
+        `${BASE}/hadeeths/list/?language=en&category_id=${root.id}&page=${page}&per_page=${PER_PAGE}`,
       );
       await delay(DELAY_MS);
       if (!data?.data?.length) break;
@@ -144,6 +133,7 @@ async function collectAllHadithIds(): Promise<Set<string>> {
       if (page >= (data.meta?.last_page ?? 1)) break;
       page++;
     }
+    console.log(`  Category ${root.id} done — running total: ${ids.size} IDs`);
   }
 
   return ids;
@@ -176,21 +166,33 @@ async function main(): Promise<void> {
   async function flush(): Promise<void> {
     if (rows.length === 0) return;
     const batch = rows.splice(0, rows.length);
+    // Deduplicate by collection_key+hadith_number — last write wins.
+    // Required because multiple hadeethenc IDs can resolve to the same row,
+    // and PostgreSQL rejects ON CONFLICT DO UPDATE when the same row appears twice.
+    const seen = new Map<string, UpsertRow>();
+    for (const row of batch) {
+      seen.set(`${row.collection_key}:${row.hadith_number}`, row);
+    }
+    const deduped = Array.from(seen.values());
     const { error } = await supabase
       .from('library_hadiths')
-      .upsert(batch, {
+      .upsert(deduped, {
         onConflict: 'collection_key,hadith_number',
         ignoreDuplicates: false,
       });
     if (error) console.error(`  [upsert error] ${error.message}`);
-    else console.log(`  Flushed ${batch.length} rows (total matched: ${matched})`);
+    else console.log(`  Flushed ${deduped.length} rows (total matched: ${matched})`);
   }
 
   for (const id of allIds) {
     processed++;
 
-    // Fetch Arabic for reference parsing
-    const ar = await fetchJson<HadithDetail>(`${BASE}/hadeeths/one/?language=ar&id=${id}`);
+    // Fetch Arabic (for reference) + German + Dutch all in parallel
+    const [ar, de, nl] = await Promise.all([
+      fetchJson<HadithDetail>(`${BASE}/hadeeths/one/?language=ar&id=${id}`),
+      fetchJson<HadithDetail>(`${BASE}/hadeeths/one/?language=de&id=${id}`),
+      fetchJson<HadithDetail>(`${BASE}/hadeeths/one/?language=nl&id=${id}`),
+    ]);
     await delay(DELAY_MS);
 
     const parsed = parseReference(ar?.reference ?? '');
@@ -198,13 +200,6 @@ async function main(): Promise<void> {
       unmatched++;
       continue;
     }
-
-    // Fetch German and Dutch translations
-    const [de, nl] = await Promise.all([
-      fetchJson<HadithDetail>(`${BASE}/hadeeths/one/?language=de&id=${id}`),
-      fetchJson<HadithDetail>(`${BASE}/hadeeths/one/?language=nl&id=${id}`),
-    ]);
-    await delay(DELAY_MS);
 
     const germanText = de?.hadeeth?.trim() || null;
     const dutchText = nl?.hadeeth?.trim() || null;
