@@ -165,7 +165,7 @@ async function main(): Promise<void> {
   // Step 1: Collect all IDs
   console.log('Step 1: Collecting all hadith IDs...');
   const allIds = await collectAllHadithIds();
-  console.log(`  ${allIds.size ?? allIds.length} unique IDs collected.\n`);
+  console.log(`  ${allIds.length} unique IDs collected.\n`);
 
   // Step 2: For each ID, fetch Arabic to check if it belongs to Riyad al-Salihin.
   //         If yes, immediately fetch all 5 translations in parallel.
