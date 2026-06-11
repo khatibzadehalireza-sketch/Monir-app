@@ -33,6 +33,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 });
 
 const CDN_BASE = 'https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions';
+const GH_RAW_BASE = 'https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions';
 const DELAY_MS = 300;
 const BATCH_SIZE = 500;
 
@@ -55,10 +56,10 @@ const API_NAME_MAP: Partial<Record<Collection, string>> = {
 };
 
 const LANGUAGES = [
-  { edition: 'tur-vakfi',      language_code: 'tr' },
-  { edition: 'urd-nasai',      language_code: 'ur' },
-  { edition: 'fra-monteil',    language_code: 'fr' },
-  { edition: 'ben-muhiuddin',  language_code: 'bn' },
+  { edition: 'tur', language: 'tr' },
+  { edition: 'urd', language: 'ur' },
+  { edition: 'fra', language: 'fr' },
+  { edition: 'ben', language: 'bn' },
 ] as const;
 
 interface HadithEntry {
@@ -71,9 +72,10 @@ interface CollectionResponse {
 }
 
 interface TranslationRow {
-  hadith_id: number;
-  language_code: string;
-  translation_text: string;
+  collection_key: string;
+  hadith_number: number;
+  language: string;
+  translated_text: string;
 }
 
 function delay(ms: number): Promise<void> {
@@ -94,18 +96,18 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
-// Build a map of "collection_key:hadith_number" → id for all relevant collections.
-async function loadHadithIdMap(): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
+// Build a set of "collection_key:hadith_number" keys for existence checks.
+async function loadHadithKeys(): Promise<Set<string>> {
+  const keys = new Set<string>();
   const PAGE = 1000;
   let offset = 0;
 
-  console.log('Loading hadith IDs from library_hadiths...');
+  console.log('Loading hadith keys from library_hadiths...');
 
   while (true) {
     const { data, error } = await supabase
       .from('library_hadiths')
-      .select('id, collection_key, hadith_number')
+      .select('collection_key, hadith_number')
       .in('collection_key', [...COLLECTIONS])
       .range(offset, offset + PAGE - 1);
 
@@ -113,33 +115,41 @@ async function loadHadithIdMap(): Promise<Map<string, number>> {
     if (!data?.length) break;
 
     for (const row of data) {
-      map.set(`${row.collection_key}:${row.hadith_number}`, row.id);
+      keys.add(`${row.collection_key}:${row.hadith_number}`);
     }
 
-    console.log(`  Loaded ${map.size} hadiths so far (offset ${offset})...`);
+    console.log(`  Loaded ${keys.size} keys so far (offset ${offset})...`);
 
     if (data.length < PAGE) break;
     offset += PAGE;
   }
 
-  console.log(`  Total hadith IDs loaded: ${map.size}\n`);
-  return map;
+  console.log(`  Total hadith keys loaded: ${keys.size}\n`);
+  return keys;
 }
 
 async function importEdition(
   edition: string,
-  language_code: string,
+  language: string,
   collection: Collection,
-  idMap: Map<string, number>,
+  hadithKeys: Set<string>,
 ): Promise<void> {
   const apiName = API_NAME_MAP[collection] ?? collection;
-  const url = `${CDN_BASE}/${edition}-${apiName}.json`;
-  console.log(`  Fetching ${url} ...`);
+  const cdnUrl = `${CDN_BASE}/${edition}-${apiName}.json`;
+  console.log(`  Fetching ${cdnUrl} ...`);
 
-  const data = await fetchJson<CollectionResponse>(url);
+  let data = await fetchJson<CollectionResponse>(cdnUrl);
+  await delay(DELAY_MS);
 
   if (!data?.hadiths?.length) {
-    console.warn(`  [warn] No hadiths returned, skipping.`);
+    const rawUrl = `${GH_RAW_BASE}/${edition}-${apiName}.json`;
+    console.log(`  [cdn failed] Retrying via GitHub raw: ${rawUrl} ...`);
+    data = await fetchJson<CollectionResponse>(rawUrl);
+    await delay(DELAY_MS);
+  }
+
+  if (!data?.hadiths?.length) {
+    console.warn(`  [warn] No hadiths returned from either source, skipping.`);
     return;
   }
 
@@ -148,21 +158,11 @@ async function importEdition(
 
   for (const h of data.hadiths) {
     const num = Number(h.hadithnumber);
-    if (!Number.isInteger(num)) {
-      skipped++;
-      continue;
-    }
+    if (!Number.isInteger(num)) { skipped++; continue; }
     const text = h.text?.trim();
-    if (!text) {
-      skipped++;
-      continue;
-    }
-    const hadith_id = idMap.get(`${collection}:${num}`);
-    if (hadith_id === undefined) {
-      skipped++;
-      continue;
-    }
-    rows.push({ hadith_id, language_code, translation_text: text });
+    if (!text) { skipped++; continue; }
+    if (!hadithKeys.has(`${collection}:${num}`)) { skipped++; continue; }
+    rows.push({ collection_key: collection, hadith_number: num, language, translated_text: text });
   }
 
   console.log(
@@ -177,7 +177,7 @@ async function importEdition(
     const { error, count } = await supabase
       .from('library_hadith_translations')
       .upsert(batch, {
-        onConflict: 'hadith_id,language_code',
+        onConflict: 'collection_key,hadith_number,language',
         ignoreDuplicates: false,
         count: 'exact',
       });
@@ -200,22 +200,22 @@ async function importEdition(
 async function main(): Promise<void> {
   console.log('=== Hadith translations import (fawazahmed0/hadith-api) ===\n');
   console.log(`Collections : ${COLLECTIONS.join(', ')}`);
-  console.log(`Languages   : ${LANGUAGES.map((l) => `${l.edition} (${l.language_code})`).join(', ')}`);
+  console.log(`Languages   : ${LANGUAGES.map((l) => `${l.edition} (${l.language})`).join(', ')}`);
   console.log(`Table       : library_hadith_translations\n`);
 
-  const idMap = await loadHadithIdMap();
+  const hadithKeys = await loadHadithKeys();
 
   const total = LANGUAGES.length * COLLECTIONS.length;
   let requestIndex = 0;
 
   for (const lang of LANGUAGES) {
     console.log(`${'='.repeat(60)}`);
-    console.log(`Language: ${lang.edition} (${lang.language_code})`);
+    console.log(`Language: ${lang.edition} (${lang.language})`);
 
     for (const collection of COLLECTIONS) {
       requestIndex++;
       console.log(`\n[${requestIndex}/${total}] ${lang.edition} — ${collection}`);
-      await importEdition(lang.edition, lang.language_code, collection, idMap);
+      await importEdition(lang.edition, lang.language, collection, hadithKeys);
 
       if (requestIndex < total) {
         console.log(`  Waiting ${DELAY_MS}ms...\n`);
