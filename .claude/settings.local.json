@@ -40,7 +40,12 @@
       "Bash(powershell -Command \"Start-Process -FilePath 'npx' -ArgumentList 'next','dev','--port','3131' -RedirectStandardOutput 'C:\\\\Users\\\\Gebruiker\\\\monir-app\\\\next-dev.log' -RedirectStandardError 'C:\\\\Users\\\\Gebruiker\\\\monir-app\\\\next-dev-err.log' -WindowStyle Hidden -WorkingDirectory 'C:\\\\Users\\\\Gebruiker\\\\monir-app'\")",
       "Bash(node *)",
       "Bash(npm install *)",
-      "Bash(npx tsx *)"
+      "Bash(npx tsx *)",
+      "Bash(npx --yes node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); Object.keys\\(j\\).filter\\(k=>k.includes\\('riyad'\\)||k.includes\\('salihin'\\)\\).forEach\\(k=>console.log\\(k\\)\\)\")",
+      "PowerShell($r = Invoke-WebRequest \"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions.json\" -UseBasicParsing; $j = $r.Content | ConvertFrom-Json; $j.PSObject.Properties | Where-Object { $_.Name -match 'riyad|salihin' } | Select-Object Name, Value)",
+      "PowerShell($r = Invoke-WebRequest \"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions.json\" -UseBasicParsing; $r.Content.Substring\\(0, 500\\))",
+      "PowerShell($r = Invoke-WebRequest \"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions.json\" -UseBasicParsing; $j = $r.Content | ConvertFrom-Json; $j.PSObject.Properties.Name)",
+      "WebSearch"
     ]
   }
 }
