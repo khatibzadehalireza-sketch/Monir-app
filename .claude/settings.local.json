@@ -45,7 +45,10 @@
       "PowerShell($r = Invoke-WebRequest \"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions.json\" -UseBasicParsing; $j = $r.Content | ConvertFrom-Json; $j.PSObject.Properties | Where-Object { $_.Name -match 'riyad|salihin' } | Select-Object Name, Value)",
       "PowerShell($r = Invoke-WebRequest \"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions.json\" -UseBasicParsing; $r.Content.Substring\\(0, 500\\))",
       "PowerShell($r = Invoke-WebRequest \"https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions.json\" -UseBasicParsing; $j = $r.Content | ConvertFrom-Json; $j.PSObject.Properties.Name)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
