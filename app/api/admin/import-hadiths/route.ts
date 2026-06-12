@@ -3,7 +3,7 @@ import { getSupabase } from '@/lib/supabase';
 
 export const maxDuration = 300;
 
-const BASE = 'https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions';
+const BASE = 'https://github.com/fawazahmed0/hadith-api/raw/1/editions';
 const BATCH = 100;
 
 const LANGS = ['ara', 'eng', 'tur', 'urd', 'fra', 'ben'] as const;
@@ -37,7 +37,7 @@ interface EditionData {
 }
 
 async function fetchEdition(lang: Lang, collection: string): Promise<EditionData | null> {
-  const url = `${BASE}/${lang}-${collection}/1.json`;
+  const url = `${BASE}/${lang}-${collection}.json`;
   const res = await fetch(url);
   if (!res.ok) return null;
   return res.json();
