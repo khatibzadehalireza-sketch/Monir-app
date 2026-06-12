@@ -9,7 +9,7 @@ const supabase = createClient(
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const BASE = 'https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions';
+const BASE = 'https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions';
 const BATCH = 100;
 
 const LANGS = ['ara', 'eng', 'tur', 'urd', 'fra', 'ben'];
@@ -35,9 +35,9 @@ const COLLECTIONS = [
 // Fetch helpers
 // ---------------------------------------------------------------------------
 async function fetchEdition(lang, collection) {
-  const url = `${BASE}/${lang}-${collection}.json`;
+  const url = `${BASE}/${lang}-${collection}/1.json`;
   const res = await fetch(url);
-  if (!res.ok) return null;
+  if (!res.ok) { console.log(`    [${res.status}] ${url}`); return null; }
   return res.json();
 }
 
