@@ -48,7 +48,8 @@
       "WebSearch",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(npx tsx scripts/import-tafsir.ts)"
     ]
   }
 }
