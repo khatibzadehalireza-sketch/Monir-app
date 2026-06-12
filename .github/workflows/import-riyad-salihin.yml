@@ -1,0 +1,105 @@
+name: Import Riyad al-Salihin
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import Riyad al-Salihin into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const SUPABASE_URL = process.env.SUPABASE_URL;
+          const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!SUPABASE_URL || !SUPABASE_KEY) {
+            console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+            process.exit(1);
+          }
+
+          const BASE = 'https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_chapter/other_books/RyadSalihin';
+          const COLLECTION_KEY = 'riyadussalihin';
+          const BATCH_SIZE = 200;
+
+          async function fetchChapter(n) {
+            const res = await fetch(`${BASE}/${n}.json`);
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`HTTP ${res.status} fetching chapter ${n}`);
+            return res.json();
+          }
+
+          async function upsertBatch(rows) {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/library_hadiths`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Prefer': 'resolution=merge-duplicates',
+              },
+              body: JSON.stringify(rows),
+            });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`Supabase upsert failed (HTTP ${res.status}): ${text}`);
+            }
+          }
+
+          async function main() {
+            console.log('=== Import Riyad al-Salihin (by chapter, AhmedBaset/hadith-json v1.2.0) ===\n');
+
+            const allRows = [];
+            let chapterNum = 1;
+
+            while (true) {
+              const data = await fetchChapter(chapterNum);
+              if (data === null) {
+                console.log(`Chapter ${chapterNum} → 404, done fetching.`);
+                break;
+              }
+
+              // Chapter files are objects with a hadiths array; fall back to bare array.
+              const hadiths = Array.isArray(data) ? data : (data.hadiths ?? []);
+              let count = 0;
+
+              for (const h of hadiths) {
+                const arabic = h.arabic?.trim();
+                if (!h.idInBook || !arabic) continue;
+
+                const narrator = h.english?.narrator?.trim() ?? '';
+                const body = h.english?.text?.trim() ?? '';
+                const english_text = narrator ? `${narrator}\n${body}` : body || null;
+
+                allRows.push({
+                  collection_key: COLLECTION_KEY,
+                  hadith_number: h.idInBook,
+                  chapter_number: chapterNum,
+                  arabic_text: arabic,
+                  english_text,
+                });
+                count++;
+              }
+
+              console.log(`Chapter ${chapterNum}: ${count} hadiths`);
+              chapterNum++;
+            }
+
+            console.log(`\nTotal hadiths: ${allRows.length}`);
+            console.log(`Upserting in batches of ${BATCH_SIZE}...`);
+
+            let upserted = 0;
+            for (let i = 0; i < allRows.length; i += BATCH_SIZE) {
+              await upsertBatch(allRows.slice(i, i + BATCH_SIZE));
+              upserted += Math.min(BATCH_SIZE, allRows.length - i);
+              console.log(`  ${upserted}/${allRows.length} rows upserted`);
+            }
+
+            console.log(`\nDone. ${upserted} rows inserted/updated.`);
+          }
+
+          main().catch(err => { console.error('Fatal:', err.message); process.exit(1); });
+          SCRIPT
