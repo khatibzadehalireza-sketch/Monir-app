@@ -3,21 +3,20 @@ import { getSupabase } from '@/lib/supabase';
 
 export const maxDuration = 300;
 
-const BASE = 'https://github.com/fawazahmed0/hadith-api/raw/1/editions';
-const BATCH = 100;
+const BASE = 'https://raw.githubusercontent.com/fawazahmed0/hadith-api/1/editions';
+const DB_BATCH = 100;
+const FETCH_CONCURRENCY = 20;
 
 const LANGS = ['ara', 'eng', 'tur', 'urd', 'fra', 'ben'] as const;
 type Lang = (typeof LANGS)[number];
 
+// urlSlug: the segment used in the URL, e.g. "nawawi" → {lang}-nawawi/{n}.json
+// count: total number of hadiths in the collection
 const COLLECTIONS = [
-  { key: 'riyadussalihin', label: 'Riyad al-Salihin' },
-  { key: 'nawawi40',       label: '40 Hadith Nawawi' },
-  { key: 'adab',           label: 'Al-Adab al-Mufrad' },
-  { key: 'bulugh',         label: 'Bulugh al-Maram' },
-  { key: 'hisn',           label: 'Hisn al-Muslim' },
+  { key: 'nawawi40', label: '40 Hadith Nawawi', urlSlug: 'nawawi', count: 42 },
 ] as const;
 
-interface HadithEntry {
+interface HadithFile {
   hadithnumber: number;
   text?: string;
   section?: number | string | null;
@@ -31,19 +30,7 @@ interface HadithEntry {
   reference?: string | Record<string, unknown> | null;
 }
 
-interface EditionData {
-  hadiths: HadithEntry[];
-  metadata?: { section?: Record<string, string> };
-}
-
-async function fetchEdition(lang: Lang, collection: string): Promise<EditionData | null> {
-  const url = `${BASE}/${lang}-${collection}.json`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  return res.json();
-}
-
-function extractGrade(h: HadithEntry): string | null {
+function extractGrade(h: HadithFile): string | null {
   if (!h.grades && !h.grade) return null;
   if (typeof h.grade === 'string') return h.grade;
   if (Array.isArray(h.grades) && h.grades.length > 0) {
@@ -52,7 +39,7 @@ function extractGrade(h: HadithEntry): string | null {
   return null;
 }
 
-function extractReference(h: HadithEntry): string | null {
+function extractReference(h: HadithFile): string | null {
   if (!h.reference) return null;
   if (typeof h.reference === 'string') return h.reference;
   if (typeof h.reference === 'object') {
@@ -63,76 +50,94 @@ function extractReference(h: HadithEntry): string | null {
   return null;
 }
 
-async function processCollection(key: string, label: string) {
-  const results = await Promise.all(
-    LANGS.map((lang) => fetchEdition(lang, key).then((data) => ({ lang, data }))),
+async function withConcurrency<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let index = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+      while (index < tasks.length) {
+        const i = index++;
+        results[i] = await tasks[i]();
+      }
+    }),
+  );
+  return results;
+}
+
+async function processCollection(
+  key: string,
+  label: string,
+  urlSlug: string,
+  count: number,
+) {
+  // Build fetch tasks for every (lang, number) pair
+  type FetchResult = { lang: Lang; num: number; data: HadithFile | null };
+
+  const tasks = LANGS.flatMap((lang) =>
+    Array.from({ length: count }, (_, i) => {
+      const num = i + 1;
+      return async (): Promise<FetchResult> => {
+        const url = `${BASE}/${lang}-${urlSlug}/${num}.json`;
+        const res = await fetch(url);
+        const data: HadithFile | null = res.ok ? await res.json() : null;
+        return { lang, num, data };
+      };
+    }),
   );
 
-  const editions: Partial<Record<Lang, EditionData>> = {};
-  const found: Lang[] = [];
-  const missing: Lang[] = [];
+  const fetched = await withConcurrency(tasks, FETCH_CONCURRENCY);
 
-  for (const { lang, data } of results) {
-    if (data && Array.isArray(data.hadiths)) {
-      editions[lang] = data;
-      found.push(lang);
+  // Group by hadith number
+  const byNumber = new Map<number, Partial<Record<Lang, HadithFile>>>();
+  const missingByLang: Partial<Record<Lang, number>> = {};
+
+  for (const { lang, num, data } of fetched) {
+    if (data) {
+      if (!byNumber.has(num)) byNumber.set(num, {});
+      byNumber.get(num)![lang] = data;
     } else {
-      missing.push(lang);
+      missingByLang[lang] = (missingByLang[lang] ?? 0) + 1;
     }
   }
 
-  if (!editions['ara']) {
-    return { key, label, found, missing, inserted: 0, skipped: true };
-  }
+  const rows = [];
+  for (const [num, langs] of byNumber.entries()) {
+    const ara = langs['ara'];
+    if (!ara) continue;
 
-  const araData = editions['ara']!;
-  const chapterMap: Record<string, string> = araData.metadata?.section ?? {};
-
-  const textByLang: Partial<Record<Lang, Map<number, string>>> = {};
-  for (const lang of found) {
-    if (lang === 'ara') continue;
-    const map = new Map<number, string>();
-    for (const h of editions[lang]!.hadiths) {
-      map.set(h.hadithnumber, h.text ?? '');
-    }
-    textByLang[lang] = map;
-  }
-
-  const rows = araData.hadiths.map((h) => {
-    const chapterNum = h.section ?? h.chapterNumber ?? h.chapter ?? null;
-    const chapterName = chapterNum != null ? (chapterMap[String(chapterNum)] ?? null) : null;
+    const chapterNum = ara.section ?? ara.chapterNumber ?? ara.chapter ?? null;
     const chapterNumParsed =
       typeof chapterNum === 'number' ? chapterNum : parseInt(String(chapterNum)) || null;
 
-    return {
-      collection_key:  key,
-      hadith_number:   h.hadithnumber,
-      book_number:     h.book ?? h.bookNumber ?? null,
-      chapter_number:  chapterNumParsed,
-      chapter_name:    chapterName,
-      arabic_text:     h.text ?? '',
-      english_text:    textByLang['eng']?.get(h.hadithnumber) ?? null,
-      turkish_text:    textByLang['tur']?.get(h.hadithnumber) ?? null,
-      urdu_text:       textByLang['urd']?.get(h.hadithnumber) ?? null,
-      french_text:     textByLang['fra']?.get(h.hadithnumber) ?? null,
-      bengali_text:    textByLang['ben']?.get(h.hadithnumber) ?? null,
-      german_text:     null,
-      dutch_text:      null,
-      narrator:        h.narrator ?? null,
-      grade:           extractGrade(h),
-      reference:       extractReference(h),
-    };
-  });
+    rows.push({
+      collection_key: key,
+      hadith_number:  num,
+      book_number:    ara.book ?? ara.bookNumber ?? null,
+      chapter_number: chapterNumParsed,
+      chapter_name:   null,
+      arabic_text:    ara.text ?? '',
+      english_text:   langs['eng']?.text ?? null,
+      turkish_text:   langs['tur']?.text ?? null,
+      urdu_text:      langs['urd']?.text ?? null,
+      french_text:    langs['fra']?.text ?? null,
+      bengali_text:   langs['ben']?.text ?? null,
+      german_text:    null,
+      dutch_text:     null,
+      narrator:       ara.narrator ?? null,
+      grade:          extractGrade(ara),
+      reference:      extractReference(ara),
+    });
+  }
 
   const supabase = getSupabase();
-  for (let i = 0; i < rows.length; i += BATCH) {
+  for (let i = 0; i < rows.length; i += DB_BATCH) {
     const { error } = await supabase
       .from('library_hadiths')
-      .upsert(rows.slice(i, i + BATCH), { onConflict: 'collection_key,hadith_number' });
+      .upsert(rows.slice(i, i + DB_BATCH), { onConflict: 'collection_key,hadith_number' });
     if (error) throw new Error(`Upsert failed for ${key}: ${error.message}`);
   }
 
-  return { key, label, found, missing, inserted: rows.length, skipped: false };
+  return { key, label, inserted: rows.length, missingByLang };
 }
 
 export async function GET(req: NextRequest) {
@@ -153,7 +158,7 @@ export async function GET(req: NextRequest) {
   const results = [];
   for (const col of targets) {
     try {
-      results.push(await processCollection(col.key, col.label));
+      results.push(await processCollection(col.key, col.label, col.urlSlug, col.count));
     } catch (err) {
       results.push({ key: col.key, label: col.label, error: (err as Error).message });
     }
