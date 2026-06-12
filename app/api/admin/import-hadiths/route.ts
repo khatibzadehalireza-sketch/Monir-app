@@ -13,7 +13,10 @@ type Lang = (typeof LANGS)[number];
 // urlSlug: the segment used in the URL, e.g. "nawawi" → {lang}-nawawi/{n}.json
 // count: total number of hadiths in the collection
 const COLLECTIONS = [
-  { key: 'nawawi40', label: '40 Hadith Nawawi', urlSlug: 'nawawi', count: 42 },
+  { key: 'nawawi40', label: '40 Hadith Nawawi',   urlSlug: 'nawawi', count: 42   },
+  { key: 'adab',     label: 'Al-Adab Al-Mufrad',  urlSlug: 'adab',   count: 1322 },
+  { key: 'bulugh',   label: 'Bulugh Al-Maram',     urlSlug: 'bulugh', count: 1358 },
+  { key: 'qudsi40',  label: '40 Hadith Qudsi',     urlSlug: 'qudsi',  count: 40   },
 ] as const;
 
 interface HadithFile {
