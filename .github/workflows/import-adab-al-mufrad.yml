@@ -22,6 +22,7 @@ jobs:
           }
 
           const CDN_URL = 'https://cdn.jsdelivr.net/gh/AhmedBaset/hadith-json@v1.2.0/db/other_books/aladab_almufrad.json';
+          const RAW_URL = 'https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/other_books/aladab_almufrad.json';
           const COLLECTION_KEY = 'adab_al_mufrad';
           const BATCH_SIZE = 200;
 
@@ -55,8 +56,16 @@ jobs:
             console.log('=== Import Al-Adab Al-Mufrad (AhmedBaset/hadith-json v1.2.0) ===\n');
 
             console.log('Fetching Al-Adab Al-Mufrad JSON...');
-            const data = await fetchJson(CDN_URL);
-            console.log(`  Fetched ${data.length} items.\n`);
+            let data;
+            try {
+              data = await fetchJson(CDN_URL);
+              console.log('  Fetched via CDN.');
+            } catch (err) {
+              console.warn(`  CDN failed (${err.message}), retrying via raw GitHub...`);
+              data = await fetchJson(RAW_URL);
+              console.log('  Fetched via raw GitHub.');
+            }
+            console.log(`  ${data.length} items.\n`);
 
             const rows = [];
             let skipped = 0;
