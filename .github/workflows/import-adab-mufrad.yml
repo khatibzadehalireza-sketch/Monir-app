@@ -21,8 +21,8 @@ jobs:
             process.exit(1);
           }
 
-          const CDN_URL = 'https://cdn.jsdelivr.net/gh/AhmedBaset/hadith-json@v1.2.0/db/other_books/aladab_almufrad.json';
-          const RAW_URL = 'https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/other_books/aladab_almufrad.json';
+          const CDN_URL = 'https://cdn.jsdelivr.net/gh/AhmedBaset/hadith-json@v1.2.0/db/by_book/other_books/aladab_almufrad.json';
+          const RAW_URL = 'https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book/other_books/aladab_almufrad.json';
           const COLLECTION_KEY = 'adab_al_mufrad';
           const BATCH_SIZE = 200;
 
