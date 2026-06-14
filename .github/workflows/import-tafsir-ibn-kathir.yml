@@ -21,7 +21,7 @@ jobs:
             process.exit(1);
           }
 
-          const BASE = 'https://quranenc.com/api/v1/translation/sura/english_ibn_katheer';
+          const BASE = 'https://api.quran.com/api/v4/tafsirs/169/by_chapter';
           const BATCH_SIZE = 200;
           const DELAY_MS = 1000;
 
@@ -30,7 +30,7 @@ jobs:
           }
 
           async function fetchSurah(surah) {
-            const res = await fetch(`${BASE}/${surah}`);
+            const res = await fetch(`${BASE}/${surah}?per_page=300`);
             if (!res.ok) throw new Error(`HTTP ${res.status} fetching surah ${surah}`);
             return res.json();
           }
@@ -59,12 +59,12 @@ jobs:
 
             for (let surah = 1; surah <= 114; surah++) {
               const data = await fetchSurah(surah);
-              const results = data.result ?? [];
+              const results = data.tafsirs ?? [];
               let count = 0;
 
               for (const item of results) {
-                const verseNum = parseInt(item.aya, 10);
-                const tafsirText = item.translation?.trim();
+                const verseNum = item.verse_number;
+                const tafsirText = item.text?.trim();
                 if (!verseNum || !tafsirText) continue;
 
                 allRows.push({
