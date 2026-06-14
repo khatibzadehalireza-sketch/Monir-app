@@ -65,7 +65,7 @@ jobs:
               let count = 0;
 
               for (const item of results) {
-                const verseNum = item.verse_number;
+                const verseNum = item.verse_number || parseInt(item.verse_key?.split(':')?.[1], 10);
                 const tafsirText = item.text?.trim();
                 if (!verseNum || !tafsirText) continue;
 
