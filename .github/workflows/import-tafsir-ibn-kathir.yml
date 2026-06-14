@@ -59,6 +59,8 @@ jobs:
 
             for (let surah = 1; surah <= 114; surah++) {
               const data = await fetchSurah(surah);
+              console.log('API response keys:', JSON.stringify(Object.keys(data)));
+              console.log('First item sample:', JSON.stringify(data.tafsirs?.[0] || data[Object.keys(data)[0]]?.[0]));
               const results = data.tafsirs ?? [];
               let count = 0;
 
