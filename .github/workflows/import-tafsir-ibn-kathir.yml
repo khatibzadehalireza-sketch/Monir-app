@@ -1,0 +1,99 @@
+name: Import Tafsir Ibn Kathir (English)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import Ibn Kathir tafsir into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const SUPABASE_URL = process.env.SUPABASE_URL;
+          const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!SUPABASE_URL || !SUPABASE_KEY) {
+            console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+            process.exit(1);
+          }
+
+          const BASE = 'https://quranenc.com/api/v1/translation/sura/english_ibn_katheer';
+          const BATCH_SIZE = 200;
+          const DELAY_MS = 1000;
+
+          function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+          }
+
+          async function fetchSurah(surah) {
+            const res = await fetch(`${BASE}/${surah}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status} fetching surah ${surah}`);
+            return res.json();
+          }
+
+          async function upsertBatch(rows) {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/library_tafsir`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Prefer': 'resolution=merge-duplicates',
+              },
+              body: JSON.stringify(rows),
+            });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`Supabase upsert failed (HTTP ${res.status}): ${text}`);
+            }
+          }
+
+          async function main() {
+            console.log('=== Import Tafsir Ibn Kathir (English, quranenc.com) ===\n');
+
+            const allRows = [];
+
+            for (let surah = 1; surah <= 114; surah++) {
+              const data = await fetchSurah(surah);
+              const results = data.result ?? [];
+              let count = 0;
+
+              for (const item of results) {
+                const verseNum = parseInt(item.aya, 10);
+                const tafsirText = item.translation?.trim();
+                if (!verseNum || !tafsirText) continue;
+
+                allRows.push({
+                  surah_number: surah,
+                  verse_number: verseNum,
+                  language_code: 'en',
+                  tafsir_text: tafsirText,
+                  author_name: 'Ibn Kathir',
+                });
+                count++;
+              }
+
+              console.log(`Surah ${surah}: ${count} verses`);
+
+              if (surah < 114) await sleep(DELAY_MS);
+            }
+
+            console.log(`\nTotal verses: ${allRows.length}`);
+            console.log(`Upserting in batches of ${BATCH_SIZE}...`);
+
+            let upserted = 0;
+            for (let i = 0; i < allRows.length; i += BATCH_SIZE) {
+              await upsertBatch(allRows.slice(i, i + BATCH_SIZE));
+              upserted += Math.min(BATCH_SIZE, allRows.length - i);
+              console.log(`  ${upserted}/${allRows.length} rows upserted`);
+            }
+
+            console.log(`\nDone. ${upserted} rows inserted/updated.`);
+          }
+
+          main().catch(err => { console.error('Fatal:', err.message); process.exit(1); });
+          SCRIPT
