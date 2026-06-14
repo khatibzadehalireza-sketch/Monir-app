@@ -1,0 +1,101 @@
+name: Import Tafsir Ibn Kathir (Arabic, spa5k)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import Arabic Ibn Kathir tafsir into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const SUPABASE_URL = process.env.SUPABASE_URL;
+          const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!SUPABASE_URL || !SUPABASE_KEY) {
+            console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+            process.exit(1);
+          }
+
+          const BASE = 'https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir/ar-tafsir-ibn-kathir';
+          const BATCH_SIZE = 200;
+          const DELAY_MS = 200;
+
+          function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+          }
+
+          async function fetchAyah(surah, ayah) {
+            const res = await fetch(`${BASE}/${surah}/${ayah}.json`);
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${surah}:${ayah}`);
+            return res.json();
+          }
+
+          async function upsertBatch(rows) {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/library_tafsir?on_conflict=surah_number,verse_number,language_code`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Prefer': 'resolution=merge-duplicates,return=minimal',
+              },
+              body: JSON.stringify(rows),
+            });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`Supabase upsert failed (HTTP ${res.status}): ${text}`);
+            }
+          }
+
+          async function main() {
+            console.log('=== Import Tafsir Ibn Kathir (Arabic, spa5k/tafsir_api) ===\n');
+
+            const allRows = [];
+
+            for (let surah = 1; surah <= 114; surah++) {
+              let count = 0;
+
+              for (let ayah = 1; ayah <= 300; ayah++) {
+                const data = await fetchAyah(surah, ayah);
+
+                if (data === null) break;
+
+                const tafsirText = data.tafsir?.trim();
+                if (tafsirText) {
+                  allRows.push({
+                    surah_number: surah,
+                    verse_number: ayah,
+                    language_code: 'ar',
+                    tafsir_text: tafsirText,
+                    author_name: 'Ibn Kathir',
+                  });
+                  count++;
+                }
+
+                await sleep(DELAY_MS);
+              }
+
+              console.log(`Surah ${surah}: ${count} verses`);
+            }
+
+            console.log(`\nTotal verses: ${allRows.length}`);
+            console.log(`Upserting in batches of ${BATCH_SIZE}...`);
+
+            let upserted = 0;
+            for (let i = 0; i < allRows.length; i += BATCH_SIZE) {
+              await upsertBatch(allRows.slice(i, i + BATCH_SIZE));
+              upserted += Math.min(BATCH_SIZE, allRows.length - i);
+              console.log(`  ${upserted}/${allRows.length} rows upserted`);
+            }
+
+            console.log(`\nDone. ${upserted} rows inserted/updated.`);
+          }
+
+          main().catch(err => { console.error('Fatal:', err.message); process.exit(1); });
+          SCRIPT
