@@ -1,6 +1,6 @@
 # Monir Islamic Library — Status
 
-> Last audited: 2026-06-28
+> Last audited: 2026-06-28 | Updated: 2026-06-28 (Mishkat + Shamail imported)
 
 ---
 
@@ -18,6 +18,8 @@
 | `library_tafsir` | 13,378 | Ibn Kathir + Muyassar (Arabic) |
 | `library_riyad_salihin` | 1,896 | Standalone table (separate from hadiths) |
 | `library_zakat_rules` | 10 | 9 categories + fallback |
+
+> **Updated 2026-06-28:** Added Mishkat al-Masabih (4,428) and Shamail al-Tirmidhi (402) to `library_hadiths`. Both are new `collection_key` values registered in `library_hadith_collections`.
 
 ---
 
@@ -38,9 +40,12 @@
 | qudsi40 | 40 | — | — | ✅ Bonus |
 | riyadussalihin | 1,896 | — | — | ✅ Complete (stored as `riyadussalihin`) |
 | tirmidhi | 3,956 | 3,956 | — | ✅ Complete |
-| **TOTAL** | **44,101** | | | |
+| mishkat | 4,428 | — | — | ✅ Complete (AhmedBaset) |
+| shamail | 402 | — | — | ✅ Complete (AhmedBaset) |
+| **TOTAL** | **48,931** | | | |
 
 > Note: Ahmad Musnad is the only major collection with a critical gap — 95% of hadiths are missing.
+> Mishkat and Shamail were added 2026-06-28 from AhmedBaset/hadith-json v1.2.0.
 
 ---
 
@@ -84,6 +89,7 @@ Tagging method: keyword-based (`tag-topics-keyword.ts`)
 
 - **Quran**: all 6,236 verses, 100% embeddings, multi-language translations
 - **Core hadith collections**: Bukhari, Muslim, Abu Dawud, Ibn Majah, Tirmidhi, Nasai, Malik, Nawawi 40, Qudsi 40, Bulugh al-Maram, Riyad al-Salihin, Adab al-Mufrad
+- **Additional collections**: Mishkat al-Masabih (4,428), Shamail al-Tirmidhi (402)
 - **Hadith embeddings**: 98.8% done
 - **Hadith translations**: 131,456 rows across multiple languages
 - **Tafsir Arabic**: both Ibn Kathir and Muyassar fully imported
@@ -95,6 +101,6 @@ Tagging method: keyword-based (`tag-topics-keyword.ts`)
 |---|---|---|
 | Ahmad Musnad | 🔴 High | Only 1,390 of 27,647 imported (5%) |
 | Muyassar English tafsir | 🟡 Medium | Arabic complete; English translation not imported |
-| Ibn Kathir English tafsir | 🟡 Medium | Only 1,895 of 6,236 verses have English |
+| Ibn Kathir English tafsir | 🟡 Medium | Only 1,895 of 6,236 verses have English — api.quran.com ID 169 is incomplete at verse level; full text requires alternative source |
 | Hadith embeddings | 🟢 Low | 524 hadiths missing (98.8% done) |
 | Hadith topic tags | 🟢 Low | 10,844 untagged (75.4% done) |

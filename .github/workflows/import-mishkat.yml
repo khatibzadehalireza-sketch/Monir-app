@@ -1,0 +1,117 @@
+name: Import Mishkat al-Masabih
+
+# Source: AhmedBaset/hadith-json v1.2.0
+# Available: 4,428 hadiths
+# collection_key: mishkat (registered in library_hadith_collections on first run)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Import Mishkat al-Masabih into Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node << 'SCRIPT'
+          const SUPABASE_URL = process.env.SUPABASE_URL;
+          const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (!SUPABASE_URL || !SUPABASE_KEY) {
+            console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+            process.exit(1);
+          }
+
+          const CDN = 'https://cdn.jsdelivr.net/gh/AhmedBaset/hadith-json@v1.2.0/db/by_book/other_books/mishkat_almasabih.json';
+          const RAW = 'https://raw.githubusercontent.com/AhmedBaset/hadith-json/v1.2.0/db/by_book/other_books/mishkat_almasabih.json';
+          const COLLECTION_KEY = 'mishkat';
+          const BATCH_SIZE = 200;
+
+          async function fetchJson(url) {
+            const res = await fetch(url, { headers: { 'User-Agent': 'monir-import/1.0' } });
+            if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`);
+            return res.json();
+          }
+
+          async function upsertBatch(rows) {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/library_hadiths`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Prefer': 'resolution=ignore-duplicates,return=minimal',
+              },
+              body: JSON.stringify(rows),
+            });
+            if (!res.ok) {
+              const text = await res.text();
+              throw new Error(`Supabase upsert failed (HTTP ${res.status}): ${text}`);
+            }
+          }
+
+          async function ensureCollection(key, nameEn, nameAr, author, total, sourceUrl) {
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/library_hadith_collections`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Prefer': 'resolution=ignore-duplicates,return=minimal',
+              },
+              body: JSON.stringify([{ collection_key: key, name_english: nameEn, name_arabic: nameAr, author, total_hadith: total, source_url: sourceUrl, is_active: true }]),
+            });
+            if (!res.ok) { const t = await res.text(); throw new Error(`Register collection failed: ${t}`); }
+            console.log(`Collection '${key}' registered (or already existed).`);
+          }
+
+          async function main() {
+            console.log('=== Import Mishkat al-Masabih — AhmedBaset/hadith-json v1.2.0 ===\n');
+            await ensureCollection('mishkat', 'Mishkat al-Masabih', 'مشكاة المصابيح', 'Al-Khatib al-Tibrizi', 4428, CDN);
+
+            let data;
+            process.stdout.write('Fetching from CDN...');
+            try { data = await fetchJson(CDN); console.log(' OK'); }
+            catch { process.stdout.write(' failed, trying raw GitHub...'); }
+
+            if (!data) {
+              try { data = await fetchJson(RAW); console.log(' OK'); }
+              catch (e) { console.error(' FAIL:', e.message); process.exit(1); }
+            }
+
+            const hadiths = data?.hadiths ?? [];
+            if (!hadiths.length) { console.error('No hadiths in response.'); process.exit(1); }
+            console.log(`Source hadiths: ${hadiths.length}\n`);
+
+            const rows = hadiths
+              .filter(h => h.idInBook && h.arabic?.trim())
+              .map(h => {
+                const narrator = h.english?.narrator?.trim() ?? '';
+                const body = h.english?.text?.trim() ?? '';
+                return {
+                  collection_key: COLLECTION_KEY,
+                  hadith_number: h.idInBook,
+                  chapter_number: h.chapterId ?? null,
+                  arabic_text: h.arabic.trim(),
+                  english_text: narrator ? `${narrator}\n${body}` : body || null,
+                  grade: null,
+                };
+              });
+
+            console.log(`Valid rows: ${rows.length}. Upserting (skip existing)...\n`);
+
+            let upserted = 0;
+            for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+              await upsertBatch(rows.slice(i, i + BATCH_SIZE));
+              upserted += Math.min(BATCH_SIZE, rows.length - i);
+              console.log(`  ${upserted}/${rows.length} processed`);
+            }
+
+            console.log(`\nDone. ${rows.length} Mishkat hadiths sent (duplicates ignored).`);
+          }
+
+          main().catch(err => { console.error('Fatal:', err.message); process.exit(1); });
+          SCRIPT
