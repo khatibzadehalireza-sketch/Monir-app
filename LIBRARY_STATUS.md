@@ -15,7 +15,7 @@
 | `library_quran_verses` | 6,236 | Complete — all 6,236 verses |
 | `library_quran_embeddings` | 6,236 | 100% coverage |
 | `library_quran_translations` | 43,652 | Multi-language Quran text |
-| `library_tafsir` | 17,714 | Ibn Kathir (AR full + EN 99.9%) + Muyassar (AR) |
+| `library_tafsir` | 29,694 | Ibn Kathir (AR+EN), Muyassar (AR), Ma'arif al-Qur'an (EN), Tazkirul Quran (EN) |
 | `library_riyad_salihin` | 1,896 | Standalone table (separate from hadiths) |
 | `library_zakat_rules` | 10 | 9 categories + fallback |
 
@@ -52,12 +52,16 @@
 |---|---:|---:|---:|
 | Ibn Kathir | 6,205 | 6,231 | 12,436 |
 | Ministry of Islamic Affairs, Saudi Arabia (Muyassar) | 5,278 | — | 5,278 |
-| **TOTAL** | **11,483** | **6,231** | **17,714** |
+| Mufti Muhammad Shafi (Ma'arif al-Qur'an) | — | 6,196 | 6,196 |
+| Maulana Wahid Uddin Khan (Tazkirul Quran) | — | 5,784 | 5,784 |
+| **TOTAL** | **11,483** | **18,211** | **29,694** |
 
 - Ibn Kathir Arabic: full (6,205 verses)
-- Ibn Kathir English: 6,231 of 6,236 verses (99.9%) — imported via api.qurancdn.com ID 169; each tafsir block expanded to cover all verses in its range. 5 verses in Surah 105 (Al-Fil) have no tafsir block in the source.
+- Ibn Kathir English: 6,231 / 6,236 (99.9%) — qurancdn.com ID 169; 5 verses in Surah 105 have no source block
 - Muyassar Arabic: full (5,278 verses)
-- Muyassar English: not yet imported
+- Muyassar English: not available on qurancdn.com — no English version exists in the API
+- Ma'arif al-Qur'an English (ID 168): 6,196 / 6,236 (99.4%) — qurancdn.com; block expansion
+- Tazkirul Quran English (ID 817): 5,784 / 6,236 (92.8%) — qurancdn.com; block expansion; 452 verses uncovered (sparse blocks in shorter surahs)
 
 ---
 
@@ -92,6 +96,8 @@ Tagging method: keyword-based. Mishkat (2,725 of 4,428 matched, 4,103 rows) and 
 - **Hadith translations**: 131,456 rows across multiple languages
 - **Tafsir Arabic**: Ibn Kathir (full) + Muyassar (full)
 - **Ibn Kathir English tafsir**: 6,231 / 6,236 verses (99.9%) — expanded from 1,895 blocks via qurancdn.com
+- **Ma'arif al-Qur'an English**: 6,196 / 6,236 verses (99.4%) — qurancdn.com ID 168
+- **Tazkirul Quran English**: 5,784 / 6,236 verses (92.8%) — qurancdn.com ID 817
 - **Hadith topic tags**: Mishkat + Shamail tagged 2026-07-01
 - **Zakat rules**: all 10 categories
 
@@ -101,7 +107,8 @@ Tagging method: keyword-based. Mishkat (2,725 of 4,428 matched, 4,103 rows) and 
 |---|---|---|
 | Ahmad Musnad | 🔴 High | Only 1,390 of 27,647 imported (5%) — needs licensed source |
 | Ibn Kathir EN tafsir (5 verses) | 🟢 Low | Surah 105 (Al-Fil) has no tafsir block in qurancdn.com source |
-| Muyassar English tafsir | 🟡 Medium | Arabic complete; English not imported |
+| Muyassar English tafsir | 🟡 Medium | Arabic complete; English version not available on qurancdn.com |
+| Tazkirul Quran (452 verses) | 🟢 Low | 92.8% coverage; shorter surahs have sparse tafsir blocks in source |
 | Hadith topic tags | 🟡 Medium | ~12,556 hadiths still untagged — keyword matching limitation |
 | Hadith embeddings | 🟢 Low | 524 hadiths have no English text so cannot be embedded |
 
@@ -118,6 +125,7 @@ Manual-trigger workflows in `.github/workflows/`:
 | `import-shamail.yml` | shamail | 402 hadiths; auto-registers collection |
 | `import-tafsir-ibn-kathir.yml` | tafsir | Ibn Kathir EN via api.quran.com (1,895 blocks only) |
 | _(script)_ `import-ibn-kathir-qurancdn.ts` | tafsir | Expands 1,895 blocks to 6,231 verse rows via qurancdn.com |
+| _(script)_ `import-en-tafsirs-qurancdn.ts` | tafsir | Ma'arif al-Qur'an (ID 168) + Tazkirul Quran (ID 817) English |
 | `import-riyad-salihin.yml` | riyadussalihin | Riyad al-Salihin by chapter |
 
 Secrets required: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
