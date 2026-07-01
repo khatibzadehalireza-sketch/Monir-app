@@ -1,6 +1,6 @@
 # Monir Islamic Library — Status
 
-> Last audited: 2026-07-01
+> Last audited: 2026-07-01 (word embeddings added same day)
 
 ---
 
@@ -16,6 +16,7 @@
 | `library_quran_embeddings` | 6,236 | 100% coverage |
 | `library_quran_translations` | 43,652 | Multi-language Quran text |
 | `library_quran_words` | 77,430 | Word-by-word: Arabic, transliteration, EN translation, audio URL |
+| `library_quran_words_embeddings` | 77,430 | 100% coverage (added 2026-07-01) |
 | `library_tafsir` | 29,694 | Ibn Kathir (AR+EN), Muyassar (AR), Ma'arif al-Qur'an (EN), Tazkirul Quran (EN) |
 | `library_riyad_salihin` | 1,896 | Standalone table (separate from hadiths) |
 | `library_zakat_rules` | 10 | 9 categories + fallback |
@@ -72,9 +73,11 @@
 |---|---:|---:|---:|
 | Hadiths | 48,931 | 48,407 | **98.9%** |
 | Quran verses | 6,236 | 6,236 | **100.0%** |
+| Quran words | 77,430 | 77,430 | **100.0%** |
 
 Embedding model: Jina AI `jina-embeddings-v3`, 384-dim.  
 The 524 unembedded hadiths have no English text — embeddings are generated from English text only.
+Quran word embeddings (added 2026-07-01) are generated from `translation_en` and stored in `library_quran_words_embeddings` (new table, migration `20260701_library_quran_words_embeddings.sql`).
 
 ---
 
