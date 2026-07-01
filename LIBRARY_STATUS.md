@@ -76,7 +76,7 @@
 | Quran words | 77,430 | 77,430 | **100.0%** |
 
 Embedding model: Jina AI `jina-embeddings-v3`, 384-dim.  
-The 524 unembedded hadiths have no English text — embeddings are generated from English text only.
+The 524 unembedded hadiths have no English text — embeddings are generated from English text only. Verified 2026-07-01: 48,407/48,407 hadiths with `english_text` are embedded (0 pending); the 524 gap is entirely empty `english_text`, and `library_hadith_translations` has no `en` rows to fall back on (only `bn`/`fr`/`tr`/`ur`) for those hadiths. Breakdown by collection: muslim 204, nasai 86, tirmidhi 67, nawawi40 42, malik 40, qudsi40 40, ahmad 31, bukhari 9, ibnmajah 3, abudawud 2.
 Quran word embeddings (added 2026-07-01) are generated from `translation_en` and stored in `library_quran_words_embeddings` (new table, migration `20260701_library_quran_words_embeddings.sql`).
 
 ---
