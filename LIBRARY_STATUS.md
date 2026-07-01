@@ -15,6 +15,7 @@
 | `library_quran_verses` | 6,236 | Complete — all 6,236 verses |
 | `library_quran_embeddings` | 6,236 | 100% coverage |
 | `library_quran_translations` | 43,652 | Multi-language Quran text |
+| `library_quran_words` | 77,430 | Word-by-word: Arabic, transliteration, EN translation, audio URL |
 | `library_tafsir` | 29,694 | Ibn Kathir (AR+EN), Muyassar (AR), Ma'arif al-Qur'an (EN), Tazkirul Quran (EN) |
 | `library_riyad_salihin` | 1,896 | Standalone table (separate from hadiths) |
 | `library_zakat_rules` | 10 | 9 categories + fallback |
@@ -89,7 +90,7 @@ Tagging method: keyword-based. Mishkat (2,725 of 4,428 matched, 4,103 rows) and 
 
 ## What's Complete
 
-- **Quran**: all 6,236 verses, 100% embeddings, multi-language translations
+- **Quran**: all 6,236 verses, 100% embeddings, multi-language translations, 77,430 word-by-word entries
 - **Core hadith collections**: Bukhari, Muslim, Abu Dawud, Ibn Majah, Tirmidhi, Nasai, Malik, Nawawi 40, Qudsi 40, Bulugh al-Maram, Riyad al-Salihin, Adab al-Mufrad
 - **Additional collections**: Mishkat al-Masabih (4,428), Shamail al-Tirmidhi (402)
 - **Hadith embeddings**: 98.9% — all hadiths with English text are embedded
